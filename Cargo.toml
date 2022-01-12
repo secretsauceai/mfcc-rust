@@ -7,4 +7,5 @@ edition = "2018"
 
 [dependencies]
 ndarray="^0.15"
+ndarray-ndimage="^0.1"
 rustdct="^0.7"
