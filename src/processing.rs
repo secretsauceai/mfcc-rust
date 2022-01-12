@@ -21,7 +21,8 @@ const __docformat__: &str = "reStructuredText";
 import numpy as np
 import math*/
 
-use ndarray::{s, Array1, Array2};
+use crate::util::tile;
+use ndarray::{s, Array1, Array2, Axis};
 
 // 1.4 becomes 1 and 1.6 becomes 2. special case: 1.5 becomes 2.
 fn round_half_up(number: i32) -> i32 {
@@ -97,7 +98,7 @@ pub fn stack_frames(
         // Zero padding
         len_sig = (numframes * frame_stride + frame_sample_length) as i32;
         let additive_zeros = ndarray::ArrayBase::zeros((len_sig - length_signal,));
-        ndarray::concatenate(0, &[sig.view(), additive_zeros.view()]);
+        ndarray::concatenate![Axis(0), sig, additive_zeros];
     } else {
         // No zero padding! The last frame which does not have enough
         // samples(remaining samples <= frame_sample_length), will be dropped!
@@ -109,19 +110,21 @@ pub fn stack_frames(
     };
 
     // Getting the indices of all frames.
-    let indices = crate::util::tile(np.arange(0, frame_sample_length), (numframes, 1))
-        + crate::util::tile(
-            ndarray::Array::range(0, numframes * frame_stride, frame_stride),
-            (frame_sample_length, 1),
-        )
-        .transpose();
+    let indices = tile(
+        ndarray::Array::range(0, frame_sample_length),
+        (numframes, 1),
+    ) + tile(
+        ndarray::Array::range(0, numframes * frame_stride, frame_stride),
+        (frame_sample_length, 1),
+    )
+    .transpose();
     indices = Array1::from::<i32>(indices);
 
     // Extracting the frames based on the allocated indices.
     let frames = signal[indices];
 
     // Apply the windows function
-    let window = crate::util::tile(filter(frame_sample_length), (numframes, 1));
+    let window = tile(filter(frame_sample_length), (numframes, 1));
     frames * window // Extracted frames
 }
 
@@ -205,7 +208,7 @@ pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: i32) -> Array2<f32
     let (rows, cols) = feat.shape();
 
     // Difining the vector of differences.
-    let mut DIF = ndarray::ArrayBase::<f32>::zeros(feat.shape());
+    let mut DIF = Array2::<f32>::zeros(feat.shape());
     let Scale = 0;
 
     // Pad only along features in the vector.
@@ -220,7 +223,7 @@ pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: i32) -> Array2<f32
         let dif = Range * FEAT.slice(s![.., offset + Range..offset + Range + cols])
             - FEAT.slice(s![.., offset - Range..offset - Range + cols]);
 
-        Scale += 2 * Range ^ 2;
+        Scale += 2 * Range.pow(2);
         DIF += dif;
     }
 
@@ -247,8 +250,8 @@ fn cmvn(vec: Array2<f32>, variance_normalization: bool /*=False*/) -> Array2<f32
     let (rows, cols) = vec.shape();
 
     // Mean calculation
-    let norm = ndarray::ArrayBase::mean_axis(vec, 0).unwrap();
-    let norm_vec = crate::util::tile(norm, (rows, 1));
+    let norm = ndarray::Array1::mean_axis(vec, 0).unwrap();
+    let norm_vec = tile(norm, (rows, 1));
 
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
@@ -256,7 +259,7 @@ fn cmvn(vec: Array2<f32>, variance_normalization: bool /*=False*/) -> Array2<f32
     // Variance normalization
     if variance_normalization {
         let stdev = ndarray::ArrayBase::std_axis(mean_subtracted, 0);
-        let stdev_vec = crate::util::tile(stdev, (rows, 1));
+        let stdev_vec = tile(stdev, (rows, 1));
         mean_subtracted / (stdev_vec + eps)
     } else {
         mean_subtracted
