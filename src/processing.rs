@@ -23,7 +23,8 @@ import math*/
 
 use crate::util::{pad, tile};
 use ndarray::{s, Array1, Array2, Axis};
-use realfft::RealFftPlanner;
+use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
+//use realfft::RealFftPlanner;
 //use rustfft::FftPlanner;
 
 // 1.4 becomes 1 and 1.6 becomes 2. special case: 1.5 becomes 2.
@@ -145,9 +146,21 @@ pub fn stack_frames(
             will be num_frames x FFT_LENGTH.
 */
 fn fft_spectrum(frames: Array2<f32>, fft_points: i32 /*=512*/) {
-    let SPECTRUM_VECTOR =
-        RealFftPlanner::new().plan_fft((frames, n = fft_points, axis = -1, norm = None);
-    np.absolute(SPECTRUM_VECTOR)
+    //SPECTRUM_VECTOR = np.fft.rfft(frames, n = fft_points, axis = -1, norm = None)
+    //in case of fire see https://github.com/secretsauceai/mfcc-rust/issues/2
+    // let real2comp = RealFftPlanner::new()
+    //     .real_planner()
+    //     .plan_fft_forward(fft_points);
+    // let mut input_vec = real2comp.make_input_vec();
+    // let mut spectrum_vector = real2comp.make_output_vec();
+    // real2comp.process(&input_vec, &output_vec);
+    let col_size = frames.shape()[1];
+    let mut handler = R2cFftHandler::<f32>::new(fft_points);
+    let mut spectrum_vector = Array2::<Complex<f32>>::zeros((fft_points / 2 + 1, col_size));
+    ndfft_r2c(&frames, &mut spectrum_vector, &mut handler, -1);
+    //would this work?
+    //spectrum_vector.abs()
+    spectrum_vector.map(|v| v.abs())
 }
 
 /**
