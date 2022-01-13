@@ -16,7 +16,7 @@ import numpy as np
 from . import processing
 from scipy.fftpack import dct
 import math*/
-use ndarray::{Array1, Array2};
+use ndarray::{Array1, Array2, ArrayView1, ArrayViewMut2};
 
 /**
  * converting from frequency to Mel scale.
@@ -32,20 +32,20 @@ pub fn frequency_to_mel(f: f64) -> f64 {
     :param mel: The mel scale values(or a single mel).
     :returns: The frequency values(or a single frequency) in Hz.
 */
-pub fn mel_to_frequency(mel: Array2<f64>) -> Array2<f64> {
+pub fn mel_to_frequency(mel: Array1<f64>) -> Array1<f64> {
     mel.map(|v| 700 * ((v / 1127.0).exp() - 1))
 }
 
-pub fn triangle(x: Array1<f64>, left: f32, middle: f32, right: f32) -> Array1<f64> {
-    let mut out = Array1::<f64>::zeros(x.shape());
-    out[x <= left] = 0;
-    out[x >= right] = 0;
+pub fn triangle(arr: ArrayViewMut2<f32>, x: Array1<f32>, left: usize, middle: usize, right: usize) {
+    //-> ArrayView1<&mut f32> {
+    let mut arr = Array1::<f64>::zeros(x.shape());
+    arr[x <= left] = 0;
+    arr[x >= right] = 0;
 
     let first_half = np.logical_and(left < x, x <= middle);
-    out[first_half] = (x[first_half] - left) / (middle - left);
+    arr[first_half] = (x[first_half] - left) / (middle - left);
     let second_half = np.logical_and(middle <= x, x < right);
-    out[second_half] = (right - x[second_half]) / (right - middle);
-    out
+    arr[second_half] = (right - x[second_half]) / (right - middle);
 }
 /**
  *

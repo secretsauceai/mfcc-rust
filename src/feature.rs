@@ -65,24 +65,27 @@ pub fn filterbanks(
 
     // we should convert Mels back to Hertz because the start and end-points
     // should be at the desired frequencies.
-    let hertz = mel_to_frequency(mels);
 
     // The frequency resolution required to put filters at the
     // exact points calculated above should be extracted.
     //  So we should round those frequencies to the closest FFT bin.
-    let freq_index = ((coefficients as i32 + 1) as f64 * hertz / sampling_freq).floor();
+    let freq_index = mel_to_frequency(mels)
+        .map(|x| ((coefficients as i32 + 1) as f64 * x / sampling_freq) as usize);
 
     // Initial definition
     let filterbank = Array2::zeros([num_filter, coefficients]);
 
     // The triangular function for each filter
     for i in 0..num_filter {
-        let left: i32 = freq_index[i].into();
-        let middle: i32 = freq_index[i + 1].into();
-        let right: i32 = freq_index[i + 2].into();
-        let z = Array::<f32>::linspace(left, right, right - left + 1);
-        filterbank.slice_mut(s![i, left..right + 1]) =
-            crate::functions::triangle(z, left, middle, right);
+        let left = freq_index[i];
+        let middle = freq_index[i + 1];
+        let right = freq_index[i + 2];
+        let z = Array1::<f32>::linspace(left as f32, right as f32, right - left + 1);
+
+        {
+            let mut s = filterbank.slice_mut(s![i, left..right + 1]);
+            triangle(s, z, left, middle, right);
+        }
     }
 
     filterbank
