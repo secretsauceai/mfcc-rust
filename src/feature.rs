@@ -44,7 +44,7 @@ pub fn filterbanks(
     sampling_freq: f64,
     low_freq: Option<f64>,
     high_freq: Option<f64>,
-) -> ndarray::ArrayBase<ndarray::OwnedRepr<_>, ndarray::Dim<[usize; 2]>> {
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::Dim<[usize; 2]>> {
     let high_freq = high_freq.unwrap_or(sampling_freq / 2.0);
     let low_freq = low_freq.unwrap_or(300.0);
     assert!(
@@ -84,7 +84,7 @@ pub fn filterbanks(
 
         {
             let mut s = filterbank.slice_mut(s![i, left..right + 1]);
-            triangle(s, z, left, middle, right);
+            triangle(&mut s, z, left, middle, right);
         }
     }
 
