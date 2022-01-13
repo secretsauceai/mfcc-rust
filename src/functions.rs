@@ -38,8 +38,7 @@ pub fn mel_to_frequency(mel: Array1<f64>) -> Array1<f64> {
 
 pub fn triangle(arr: ArrayViewMut2<f32>, x: Array1<f32>, left: usize, middle: usize, right: usize) {
     //original function: https://github.com/astorfi/speechpy/blob/master/speechpy/functions.py#L44
-    //-> ArrayView1<&mut f32> {
-    //let mut arr = Array1::<f64>::zeros(x.shape());
+
     //arr[x <= left] = 0;
     //arr[x >= right] = 0;
     arr.iter().enumerate().for_each(|(i, v)| {
@@ -49,7 +48,7 @@ pub fn triangle(arr: ArrayViewMut2<f32>, x: Array1<f32>, left: usize, middle: us
                 *v = (x[i] - left) / (middle - left);
             } //NOTE: depending on whether the double <= >= is intended or not, may be simplified to just else
             if middle <= x {
-                *v = (right - x[i]) / (right - middle)
+                *v = (right - x[i]) / (right - middle);
             }
         } else {
             *v = 0.0
