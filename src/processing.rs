@@ -45,8 +45,15 @@ use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 */
 fn preemphasis(signal: Array1<f32>, shift: i32 /*1*/, cof: f32 /*=0.98*/) -> Array1<f32> {
     //Note: https://github.com/rust-ndarray/ndarray/issues/281
-    let rolled_signal = np.roll(signal, shift);
-    signal - cof * rolled_signal
+
+    //let rolled_signal = np.roll(signal, shift);
+    let mut rolled_signal = Array1::<f32>::zeros(signal.shape());
+    {
+        let mut s = rolled_signal.slice_mut(s![1..-1, ..]);
+        s += &signal.slice(s![shift.., ..]);
+        s -= &signal.slice(s![..-shift, ..]);
+    }
+    signal - (cof * rolled_signal)
 }
 
 /**
