@@ -24,7 +24,7 @@ use ndarray::{Array1, Array2};
     :returns: The mel scale values(or a single mel).
 */
 pub fn frequency_to_mel(f: f64) -> f64 {
-    1127 * np.log(1 + f / 700.)
+    1127 * (1 + f / 700.).log()
 }
 //Note: may want to try this crate https://github.com/SuperFluffy/rust-expm
 /**

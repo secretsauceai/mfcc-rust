@@ -74,8 +74,8 @@ pub fn stack_frames(
     assert!(
         sig.ndim == 1,
         format!(
-            "Signal dimention should be of the format of (N,) but it is %s instead",
-            str(sig.shape)
+            "Signal dimention should be of the format of (N,) but it is {:?} instead",
+            sig.shape
         )
     );
 
