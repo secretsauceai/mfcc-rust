@@ -70,7 +70,7 @@ pub fn filterbanks(
     // The frequency resolution required to put filters at the
     // exact points calculated above should be extracted.
     //  So we should round those frequencies to the closest FFT bin.
-    let freq_index = ((coefficients as i32 + 1) * hertz / sampling_freq).floor();
+    let freq_index = ((coefficients as i32 + 1) as f64 * hertz / sampling_freq).floor();
 
     // Initial definition
     let filterbank = Array2::zeros([num_filter, coefficients]);
@@ -80,7 +80,7 @@ pub fn filterbanks(
         let left: i32 = freq_index[i].into();
         let middle: i32 = freq_index[i + 1].into();
         let right: i32 = freq_index[i + 2].into();
-        let z = Array::<f32>::linspace(left, right, num = right - left + 1);
+        let z = Array::<f32>::linspace(left, right, right - left + 1);
         filterbank.slice_mut(s![i, left..right + 1]) =
             crate::functions::triangle(z, left, middle, right);
     }

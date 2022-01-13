@@ -33,7 +33,7 @@ pub fn frequency_to_mel(f: f64) -> f64 {
     :returns: The frequency values(or a single frequency) in Hz.
 */
 pub fn mel_to_frequency(mel: Array2<f64>) -> Array2<f64> {
-    700 * (np.exp(mel / 1127.0) - 1)
+    mel.map(|v| 700 * ((v / 1127.0).exp() - 1))
 }
 
 pub fn triangle(x: Array1<f64>, left: f32, middle: f32, right: f32) -> Array1<f64> {

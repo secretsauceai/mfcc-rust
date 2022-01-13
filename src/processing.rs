@@ -23,13 +23,15 @@ import math*/
 
 use crate::util::{pad, tile};
 use ndarray::{s, Array1, Array2, Axis};
+use realfft::RealFftPlanner;
+//use rustfft::FftPlanner;
 
 // 1.4 becomes 1 and 1.6 becomes 2. special case: 1.5 becomes 2.
-fn round_half_up(number: i32) -> i32 {
-    return decimal
-        .Decimal(number)
-        .quantize(decimal.Decimal('1'), rounding = decimal.ROUND_HALF_UP) as i32;
-}
+// fn round_half_up(number: i32) -> i32 {
+//     return decimal
+//         .Decimal(number)
+//         .quantize(decimal.Decimal('1'), rounding = decimal.ROUND_HALF_UP) as i32;
+// }
 
 /**
  *  preemphasising on the signal.
@@ -41,6 +43,7 @@ fn round_half_up(number: i32) -> i32 {
            array: The pre-emphasized signal.
 */
 fn preemphasis(signal: Array1<f32>, shift: i32 /*1*/, cof: f32 /*=0.98*/) -> Array1<f32> {
+    //Note: https://github.com/rust-ndarray/ndarray/issues/281
     let rolled_signal = np.roll(signal, shift);
     signal - cof * rolled_signal
 }
@@ -142,7 +145,8 @@ pub fn stack_frames(
             will be num_frames x FFT_LENGTH.
 */
 fn fft_spectrum(frames: Array2<f32>, fft_points: i32 /*=512*/) {
-    let SPECTRUM_VECTOR = np.fft.rfft(frames, n = fft_points, axis = -1, norm = None);
+    let SPECTRUM_VECTOR =
+        RealFftPlanner::new().plan_fft((frames, n = fft_points, axis = -1, norm = None);
     np.absolute(SPECTRUM_VECTOR)
 }
 
