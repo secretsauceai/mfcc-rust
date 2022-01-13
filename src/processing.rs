@@ -21,7 +21,7 @@ const __docformat__: &str = "reStructuredText";
 import numpy as np
 import math*/
 
-use crate::util::tile;
+use crate::util::{pad, tile};
 use ndarray::{s, Array1, Array2, Axis};
 
 // 1.4 becomes 1 and 1.6 becomes 2. special case: 1.5 becomes 2.
@@ -212,7 +212,7 @@ pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: i32) -> Array2<f32
     let Scale = 0;
 
     // Pad only along features in the vector.
-    let FEAT = ndarray_ndimage::pad(feat, ((0, 0), (DeltaWindows, DeltaWindows)), "edge");
+    let FEAT = pad(feat, ((0, 0), (DeltaWindows, DeltaWindows)), "edge");
     for i in 0..DeltaWindows {
         // Start index
         let offset = DeltaWindows;
@@ -297,7 +297,7 @@ fn cmvnw(
     // Padding and initial definitions
     let pad_size = (win_size - 1) / 2;
     //NOTE: see https://github.com/rust-ndarray/ndarray/issues/823#issuecomment-942392888
-    let vec_pad = ndarray_ndimage::pad(vec, ((pad_size, pad_size), (0, 0)), "symmetric");
+    let vec_pad = pad(vec, ((pad_size, pad_size), (0, 0)), "symmetric");
     let mut mean_subtracted = ndarray::ArrayBase::<f32>::zeros(vec);
 
     for i in 0..rows {
@@ -310,8 +310,7 @@ fn cmvnw(
     if variance_normalization {
         // Initial definitions.
         let variance_normalized = Array2::<f32>::zeros(vec.shape());
-        let vec_pad_variance =
-            ndarray_ndimage::pad(mean_subtracted, ((pad_size, pad_size), (0, 0)), "symmetric");
+        let vec_pad_variance = pad(mean_subtracted, ((pad_size, pad_size), (0, 0)), "symmetric");
 
         // Looping over all observations.
         for i in 0..rows {
