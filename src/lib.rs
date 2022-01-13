@@ -1,6 +1,7 @@
 mod feature;
 mod functions;
 mod processing;
+mod util;
 
 #[cfg(test)]
 mod tests {
