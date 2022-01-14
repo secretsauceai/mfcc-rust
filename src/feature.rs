@@ -16,7 +16,7 @@ Functions:
 use crate::functions::{frequency_to_mel, mel_to_frequency, triangle, zero_handling};
 use crate::processing::{power_spectrum, stack_frames};
 
-use ndarray::{concatenate, s, Array, Array1, Array2, ArrayBase, Axis, OwnedRepr};
+use ndarray::{concatenate, s, Array, Array1, Array2, ArrayBase, ArrayViewMut1, Axis, OwnedRepr};
 
 /*from __future__ import division
 import numpy as np
@@ -83,8 +83,8 @@ pub fn filterbanks(
         let z = Array1::<f32>::linspace(left as f32, right as f32, right - left + 1);
 
         {
-            let mut s = filterbank.slice_mut(s![i, left..right + 1]);
-            triangle(&mut s, z, left, middle, right);
+            let mut s: ArrayViewMut1<f32> = filterbank.slice_mut(s![i, left..right + 1]);
+            triangle(s, z, left, middle, right);
         }
     }
 
@@ -128,7 +128,7 @@ fn mfcc(
 ) {
     let (feature, energy) = mfe(
         signal,
-        sampling_frequency = sampling_frequency,
+        sampling_frequency,
         frame_length,
         frame_stride,
         num_filters,
@@ -178,10 +178,10 @@ fn mfcc(
              array: features - the energy of fiterbank of size num_frames x num_filters. The energy of each frame: num_frames x 1
    */
 fn mfe(
-    signal: Array1<f64>,
+    signal: Array1<f32>,
     sampling_frequency: i32,
-    frame_length: f64,           /*=0.020*/
-    frame_stride: f64,           /*=0.01*/
+    frame_length: f32,           /*=0.020*/
+    frame_stride: f32,           /*=0.01*/
     num_filters: i32,            /*=40*/
     fft_length: i32,             /*=512*/
     low_frequency: f64,          /*=0*/
@@ -189,14 +189,14 @@ fn mfe(
 ) -> (Array1<f64>, Array1<f64>) {
     // Convert to float
     //let signal = signal.type(float);
-
+    let f = |x: i32| Array1::<f32>::ones(x as usize);
     // Stack frames
     let frames = stack_frames(
         signal,
         sampling_frequency,
         frame_length,
         frame_stride,
-        |x| ArrayBase::ones((x,)),
+        &f,
         false, /*=False*/
     );
 

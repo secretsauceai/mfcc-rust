@@ -72,11 +72,11 @@ fn preemphasis(signal: Array1<f32>, shift: i32 /*1*/, cof: f32 /*=0.98*/) -> Arr
             array: Stacked_frames-Array of frames of size (number_of_frames x frame_len).
 */
 pub fn stack_frames(
-    sig: Array2<f32>,
+    sig: Array1<f32>,
     sampling_frequency: i32,
     frame_length: f32, /*=0.020*/
     frame_stride: f32, /*=0.020*/
-    filter: Fn(Array2<f32>) -> Array2<f32>, /*=lambda x: np.ones(
+    filter: fn(i32) -> Array1<f32>, /*=lambda x: np.ones(
                        (x,
                         ))*/
     zero_padding: bool, /*=True*/
@@ -91,9 +91,9 @@ pub fn stack_frames(
     );
 
     // Initial necessary values
-    let length_signal = sig.shape[0];
-    let frame_sample_length = (sampling_frequency * frame_length).round(); // Defined by the number of samples
-    let frame_stride = (sampling_frequency * frame_stride).round();
+    let length_signal = sig.len();
+    let frame_sample_length = (sampling_frequency as f32 * frame_length).round(); // Defined by the number of samples
+    let frame_stride = (sampling_frequency as f32 * frame_stride).round();
     let mut len_sig = 0;
     let mut numframes = 0;
 

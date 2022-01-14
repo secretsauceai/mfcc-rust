@@ -16,7 +16,7 @@ import numpy as np
 from . import processing
 from scipy.fftpack import dct
 import math*/
-use ndarray::{Array1, Array2, ArrayView1, ArrayViewMut2};
+use ndarray::{Array1, Array2, ArrayView1, ArrayViewMut1, ArrayViewMut2};
 
 /**
  * converting from frequency to Mel scale.
@@ -24,7 +24,7 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayViewMut2};
     :returns: The mel scale values(or a single mel).
 */
 pub fn frequency_to_mel(f: f64) -> f64 {
-    1127 * (1 + f / 700.).log()
+    1127. * (1. + f / 700.).ln()
 }
 //Note: may want to try this crate https://github.com/SuperFluffy/rust-expm
 /**
@@ -33,10 +33,10 @@ pub fn frequency_to_mel(f: f64) -> f64 {
     :returns: The frequency values(or a single frequency) in Hz.
 */
 pub fn mel_to_frequency(mel: Array1<f64>) -> Array1<f64> {
-    mel.map(|v| 700 * ((v / 1127.0).exp() - 1))
+    mel.map(|v| 700. * ((v / 1127.0).exp() - 1.))
 }
 
-pub fn triangle(arr: ArrayViewMut2<f32>, x: Array1<f32>, left: usize, middle: usize, right: usize) {
+pub fn triangle(arr: ArrayViewMut1<f32>, x: Array1<f32>, left: f32, middle: f32, right: f32) {
     //original function: https://github.com/astorfi/speechpy/blob/master/speechpy/functions.py#L44
 
     //arr[x <= left] = 0;
@@ -44,10 +44,10 @@ pub fn triangle(arr: ArrayViewMut2<f32>, x: Array1<f32>, left: usize, middle: us
     arr.iter().enumerate().for_each(|(i, v)| {
         if let left..=right = v {
             //TODO: fix range bounds to be exclusive
-            if v <= middle {
+            if v <= &middle {
                 *v = (x[i] - left) / (middle - left);
             } //NOTE: depending on whether the double <= >= is intended or not, may be simplified to just else
-            if middle <= x {
+            if &middle <= v {
                 *v = (right - x[i]) / (right - middle);
             }
         } else {
