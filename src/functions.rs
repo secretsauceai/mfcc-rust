@@ -43,7 +43,7 @@ pub fn triangle(arr: ArrayViewMut1<f32>, x: Array1<f32>, left: f32, middle: f32,
     //arr[x >= right] = 0;
     arr.iter().enumerate().for_each(|(i, v)| {
         if let left..=right = v {
-            //TODO: fix range bounds to be exclusive
+            //TODO: fix range bounds to be exclusive, see https://github.com/rust-lang/rust/issues/37854
             if v <= &middle {
                 *v = (x[i] - left) / (middle - left);
             } //NOTE: depending on whether the double <= >= is intended or not, may be simplified to just else

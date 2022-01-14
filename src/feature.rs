@@ -77,13 +77,14 @@ pub fn filterbanks(
 
     // The triangular function for each filter
     for i in 0..num_filter {
-        let left = freq_index[i];
-        let middle = freq_index[i + 1];
-        let right = freq_index[i + 2];
-        let z = Array1::<f32>::linspace(left as f32, right as f32, right - left + 1);
+        let left = freq_index[i] as f32;
+        let middle = freq_index[i + 1] as f32;
+        let right = freq_index[i + 2] as f32;
+        let z = Array1::<f32>::linspace(left, right, right as usize - left as usize + 1);
 
         {
-            let mut s: ArrayViewMut1<f32> = filterbank.slice_mut(s![i, left..right + 1]);
+            let mut s: ArrayViewMut1<f32> =
+                filterbank.slice_mut(s![i, left as usize..right as usize + 1]);
             triangle(s, z, left, middle, right);
         }
     }
@@ -185,8 +186,8 @@ fn mfe(
     num_filters: i32,            /*=40*/
     fft_length: i32,             /*=512*/
     low_frequency: f64,          /*=0*/
-    high_frequency: Option<f64>, /*None*/
-) -> (Array1<f64>, Array1<f64>) {
+    high_frequency: Option<f32>, /*None*/
+) -> (Array1<f32>, Array1<f32>) {
     // Convert to float
     //let signal = signal.type(float);
     let f = |x: i32| Array1::<f32>::ones(x as usize);
@@ -201,7 +202,7 @@ fn mfe(
     );
 
     // getting the high frequency
-    let high_frequency = high_frequency.unwrap_or(sampling_frequency / 2);
+    let high_frequency = high_frequency.unwrap_or(sampling_frequency as f32 / 2);
 
     // calculation of the power sprectum
     let power_spectrum = crate::processing::power_spectrum(frames, fft_length);
