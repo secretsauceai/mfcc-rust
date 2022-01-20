@@ -47,11 +47,10 @@ fn preemphasis(signal: Array1<f32>, shift: i32 /*1*/, cof: f32 /*=0.98*/) -> Arr
     //Note: https://github.com/rust-ndarray/ndarray/issues/281
 
     //let rolled_signal = np.roll(signal, shift);
-    let mut rolled_signal = Array1::<f32>::zeros(signal.shape());
+    let mut rolled_signal = Array1::<f32>::zeros(signal.shape()[0]);
     {
-        let mut s = rolled_signal.slice_mut(s![1..-1, ..]);
-        s += &signal.slice(s![shift.., ..]);
-        s -= &signal.slice(s![..-shift, ..]);
+        rolled_signal += &signal.slice(s![shift..]);
+        rolled_signal -= &signal.slice(s![..-shift]);
     }
     signal - (cof * rolled_signal)
 }
@@ -83,20 +82,22 @@ pub fn stack_frames(
 ) -> Array2<f32> {
     // Check dimension
     assert!(
-        sig.ndim == 1,
+        sig.ndim() == 1,
         format!(
             "Signal dimention should be of the format of (N,) but it is {:?} instead",
-            sig.shape
+            sig.shape()
         )
     );
 
     // Initial necessary values
-    let length_signal = sig.len();
+    let length_signal = sig.len() as f32;
     let frame_sample_length = (sampling_frequency as f32 * frame_length).round(); // Defined by the number of samples
     let frame_stride = (sampling_frequency as f32 * frame_stride).round();
     let mut len_sig = 0;
     let mut numframes = 0;
 
+    //TODO: once the code is working simplify this section, handle sig directly and
+    //let the bolow if else declare the last index
     // Zero padding is done for allocating space for the last frame.
     let signal = if zero_padding {
         // Calculation of number of frames
@@ -107,17 +108,17 @@ pub fn stack_frames(
         );
 
         // Zero padding
-        len_sig = (numframes * frame_stride + frame_sample_length) as i32;
+        len_sig = (numframes as f32 * frame_stride + frame_sample_length) as i32;
         let additive_zeros = ndarray::ArrayBase::zeros((len_sig - length_signal,));
-        ndarray::concatenate![Axis(0), sig, additive_zeros];
+        ndarray::concatenate![Axis(0), sig, additive_zeros]
     } else {
         // No zero padding! The last frame which does not have enough
         // samples(remaining samples <= frame_sample_length), will be dropped!
-        numframes = (length_signal - frame_sample_length) / frame_stride;
+        numframes = ((length_signal - frame_sample_length) / frame_stride) as i32;
 
         // new length
-        let len_sig = ((numframes - 1) * frame_stride + frame_sample_length) as i32;
-        sig[0..len_sig]
+        let len_sig = ((numframes - 1) as f32 * frame_stride + frame_sample_length) as i32;
+        sig.slice_move(s![0..len_sig])
     };
 
     // Getting the indices of all frames.

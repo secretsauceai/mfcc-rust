@@ -41,13 +41,13 @@ pub fn triangle(arr: ArrayViewMut1<f32>, x: Array1<f32>, left: f32, middle: f32,
 
     //arr[x <= left] = 0;
     //arr[x >= right] = 0;
-    arr.iter().enumerate().for_each(|(i, v)| {
-        if let left..=right = v {
+    arr.indexed_iter_mut().for_each(|(i, v)| {
+        if (left..right).contains(v) {
             //TODO: fix range bounds to be exclusive, see https://github.com/rust-lang/rust/issues/37854
-            if v <= &middle {
+            if v <= &mut middle {
                 *v = (x[i] - left) / (middle - left);
             } //NOTE: depending on whether the double <= >= is intended or not, may be simplified to just else
-            if &middle <= v {
+            if &mut middle <= v {
                 *v = (right - x[i]) / (right - middle);
             }
         } else {
