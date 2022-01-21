@@ -21,6 +21,8 @@ const __docformat__: &str = "reStructuredText";
 import numpy as np
 import math*/
 
+use std::ops::Mul;
+
 use crate::util::{pad, tile};
 use ndarray::{s, Array1, Array2, Axis};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
@@ -153,7 +155,7 @@ pub fn stack_frames(
             If frames is an num_frames x sample_per_frame matrix, output
             will be num_frames x FFT_LENGTH.
 */
-fn fft_spectrum(frames: Array2<f32>, fft_points: i32 /*=512*/) {
+fn fft_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2<f32> {
     //SPECTRUM_VECTOR = np.fft.rfft(frames, n = fft_points, axis = -1, norm = None)
     //in case of fire see https://github.com/secretsauceai/mfcc-rust/issues/2
     // let real2comp = RealFftPlanner::new()
@@ -165,10 +167,15 @@ fn fft_spectrum(frames: Array2<f32>, fft_points: i32 /*=512*/) {
     let col_size = frames.shape()[1];
     let mut handler = R2cFftHandler::<f32>::new(fft_points);
     let mut spectrum_vector = Array2::<Complex<f32>>::zeros((fft_points / 2 + 1, col_size));
-    ndfft_r2c(&frames, &mut spectrum_vector, &mut handler, -1);
+    ndfft_r2c(
+        &frames,
+        &mut spectrum_vector,
+        &mut handler,
+        frames.shape()[1], //this is the last axis right
+    );
     //would this work?
     //spectrum_vector.abs()
-    spectrum_vector.map(|v| v.abs())
+    spectrum_vector.map(|v: &Complex<f32>| -> f32 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() as f32 })
 }
 
 /**
@@ -181,8 +188,8 @@ fn fft_spectrum(frames: Array2<f32>, fft_points: i32 /*=512*/) {
             If frames is an num_frames x sample_per_frame matrix, output
             will be num_frames x fft_length.
 */
-pub fn power_spectrum(frames: Array1<f32>, fft_points: i32 /*=512*/) -> Array2<f32> {
-    (1.0 / fft_points as f32) * ndarray::ArrayBase::square(fft_spectrum(frames, fft_points))
+pub fn power_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2<f32> {
+    fft_spectrum(frames, fft_points).map(|x| (1. / fft_points as f32) * *x)
 }
 
 /**
@@ -200,18 +207,21 @@ pub fn power_spectrum(frames: Array1<f32>, fft_points: i32 /*=512*/) -> Array2<f
 */
 fn log_power_spectrum(
     frames: Array2<f32>,
-    fft_points: i32, /*=512*/
-    normalize: bool, /*=True*/
+    fft_points: usize, /*=512*/
+    normalize: bool,   /*=True*/
 ) -> Array2<f32> {
+    let mut mx = 1e-20 as f32; //had to do this because of trait constraints on max
     let log_power_spec = power_spectrum(frames, fft_points).map(|x| {
         if *x > 1e-20 {
-            10 * x.log10()
+            *x = 10. * x.log10();
+            mx = *x;
+            *x
         } else {
             -200.0 //10*log10(1e-20)
         }
     });
     if normalize {
-        log_power_spec - log_power_spec.max()
+        log_power_spec - mx
     } else {
         log_power_spec
     }
@@ -228,16 +238,16 @@ This function the derivative features.
            array: Derivative feature vector - A NUMFRAMESxNUMFEATURES numpy
            array which is the derivative features along the features.
 */
-pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: i32) -> Array2<f32> {
+pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: usize) -> Array2<f32> {
     // Getting the shape of the vector.
-    let (rows, cols) = feat.shape();
+    let [rows, cols] = feat.shape();
 
     // Difining the vector of differences.
-    let mut DIF = Array2::<f32>::zeros(feat.shape());
-    let Scale = 0;
+    let mut DIF = Array2::<f32>::zeros(feat.raw_dim());
+    let Scale = 0.;
 
     // Pad only along features in the vector.
-    let FEAT = pad(feat, ((0, 0), (DeltaWindows, DeltaWindows)), "edge");
+    let FEAT = pad(&feat, vec![[0, 0], [DeltaWindows, DeltaWindows]], "edge");
     for i in 0..DeltaWindows {
         // Start index
         let offset = DeltaWindows;
@@ -245,11 +255,13 @@ pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: i32) -> Array2<f32
         // The dynamic range
         let Range = i + 1;
 
-        let dif = Range * FEAT.slice(s![.., offset + Range..offset + Range + cols])
+        let dif = FEAT
+            .slice(s![.., offset + Range..offset + Range + cols])
+            .mul(Range as f32)
             - FEAT.slice(s![.., offset - Range..offset - Range + cols]);
 
-        Scale += 2 * Range.pow(2);
-        DIF += dif;
+        Scale += 2. * (Range as f32).powf(2.);
+        DIF = DIF + dif;
     }
 
     DIF / Scale
@@ -271,11 +283,11 @@ pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: i32) -> Array2<f32
           array: The mean(or mean+variance) normalized feature vector.
 */
 fn cmvn(vec: Array2<f32>, variance_normalization: bool /*=False*/) -> Array2<f32> {
-    let eps = 2.0f32.powf(-30);
-    let (rows, cols) = vec.shape();
+    let eps = 2.0f32.powf(-30.);
+    let [rows, cols] = vec.shape();
 
     // Mean calculation
-    let norm = ndarray::Array1::mean_axis(vec, 0).unwrap();
+    let norm = &vec.mean_axis(Axis(0)).unwrap();
     let norm_vec = tile(norm, (rows, 1));
 
     // Mean subtraction
@@ -283,7 +295,7 @@ fn cmvn(vec: Array2<f32>, variance_normalization: bool /*=False*/) -> Array2<f32
 
     // Variance normalization
     if variance_normalization {
-        let stdev = ndarray::ArrayBase::std_axis(mean_subtracted, 0);
+        let stdev = mean_subtracted.std_axis(Axis(0), 0.);
         let stdev_vec = tile(stdev, (rows, 1));
         mean_subtracted / (stdev_vec + eps)
     } else {
@@ -312,20 +324,20 @@ fn cmvnw(
     variance_normalization: bool, /*=False*/
 ) {
     // Get the shapes
-    let eps = 2 * *-30;
-    let (rows, cols) = vec.shape;
+    let eps = 2f32.powf(-30.);
+    let [rows, cols] = vec.shape();
 
     // Windows size must be odd.
     //assert isinstance(win_size, int), "Size must be of type 'int'!"
     assert!(win_size % 2 == 1, "Windows size must be odd!");
 
     // Padding and initial definitions
-    let pad_size = (win_size - 1) / 2;
+    let pad_size = ((win_size - 1) / 2) as usize;
     //NOTE: see https://github.com/rust-ndarray/ndarray/issues/823#issuecomment-942392888
-    let vec_pad = pad(vec, ((pad_size, pad_size), (0, 0)), "symmetric");
-    let mut mean_subtracted = ndarray::ArrayBase::<f32>::zeros(vec);
+    let vec_pad = pad(&vec, vec![[pad_size, pad_size], [0, 0]], "symmetric");
+    let mut mean_subtracted = ndarray::Array1::<f32>::zeros(vec.raw_dim());
 
-    for i in 0..rows {
+    for i in 0..*rows {
         let window = vec_pad.slice(s![i..i + win_size, ..]);
         let window_mean = ndarray::ArrayBase::mean_axis(window, 0);
         mean_subtracted.slice(s![i, ..]) = vec.slice(s![i, ..]) - window_mean;
