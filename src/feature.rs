@@ -16,7 +16,7 @@ Functions:
 use crate::functions::{frequency_to_mel, mel_to_frequency, triangle, zero_handling};
 use crate::processing::{power_spectrum, stack_frames};
 
-use ndarray::{concatenate, s, Array, Array1, Array2, ArrayBase, Axis, OwnedRepr};
+use ndarray::{concatenate, s, Array, Array1, Array2, ArrayBase, ArrayViewMut1, Axis, OwnedRepr};
 
 /*from __future__ import division
 import numpy as np
@@ -44,7 +44,7 @@ pub fn filterbanks(
     sampling_freq: f64,
     low_freq: Option<f64>,
     high_freq: Option<f64>,
-) -> ndarray::ArrayBase<ndarray::OwnedRepr<_>, ndarray::Dim<[usize; 2]>> {
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::Dim<[usize; 2]>> {
     let high_freq = high_freq.unwrap_or(sampling_freq / 2.0);
     let low_freq = low_freq.unwrap_or(300.0);
     assert!(
@@ -65,24 +65,28 @@ pub fn filterbanks(
 
     // we should convert Mels back to Hertz because the start and end-points
     // should be at the desired frequencies.
-    let hertz = mel_to_frequency(mels);
 
     // The frequency resolution required to put filters at the
     // exact points calculated above should be extracted.
     //  So we should round those frequencies to the closest FFT bin.
-    let freq_index = ((coefficients as i32 + 1) * hertz / sampling_freq).floor();
+    let freq_index = mel_to_frequency(mels)
+        .map(|x| ((coefficients as i32 + 1) as f64 * x / sampling_freq) as usize);
 
     // Initial definition
     let filterbank = Array2::zeros([num_filter, coefficients]);
 
     // The triangular function for each filter
     for i in 0..num_filter {
-        let left: i32 = freq_index[i].into();
-        let middle: i32 = freq_index[i + 1].into();
-        let right: i32 = freq_index[i + 2].into();
-        let z = Array::<f32>::linspace(left, right, num = right - left + 1);
-        filterbank.slice_mut(s![i, left..right + 1]) =
-            crate::functions::triangle(z, left, middle, right);
+        let left = freq_index[i] as f32;
+        let middle = freq_index[i + 1] as f32;
+        let right = freq_index[i + 2] as f32;
+        let z = Array1::<f32>::linspace(left, right, right as usize - left as usize + 1);
+
+        {
+            let mut s: ArrayViewMut1<f32> =
+                filterbank.slice_mut(s![i, left as usize..right as usize + 1]);
+            triangle(s, z, left, middle, right);
+        }
     }
 
     filterbank
@@ -125,7 +129,7 @@ fn mfcc(
 ) {
     let (feature, energy) = mfe(
         signal,
-        sampling_frequency = sampling_frequency,
+        sampling_frequency,
         frame_length,
         frame_stride,
         num_filters,
@@ -175,30 +179,30 @@ fn mfcc(
              array: features - the energy of fiterbank of size num_frames x num_filters. The energy of each frame: num_frames x 1
    */
 fn mfe(
-    signal: Array1<f64>,
+    signal: Array1<f32>,
     sampling_frequency: i32,
-    frame_length: f64,           /*=0.020*/
-    frame_stride: f64,           /*=0.01*/
+    frame_length: f32,           /*=0.020*/
+    frame_stride: f32,           /*=0.01*/
     num_filters: i32,            /*=40*/
     fft_length: i32,             /*=512*/
     low_frequency: f64,          /*=0*/
-    high_frequency: Option<f64>, /*None*/
-) -> (Array1<f64>, Array1<f64>) {
+    high_frequency: Option<f32>, /*None*/
+) -> (Array1<f32>, Array1<f32>) {
     // Convert to float
     //let signal = signal.type(float);
-
+    let f = |x: i32| Array1::<f32>::ones(x as usize);
     // Stack frames
     let frames = stack_frames(
         signal,
         sampling_frequency,
         frame_length,
         frame_stride,
-        |x| ArrayBase::ones((x,)),
+        &f,
         false, /*=False*/
     );
 
     // getting the high frequency
-    let high_frequency = high_frequency.unwrap_or(sampling_frequency / 2);
+    let high_frequency = high_frequency.unwrap_or(sampling_frequency as f32 / 2);
 
     // calculation of the power sprectum
     let power_spectrum = crate::processing::power_spectrum(frames, fft_length);

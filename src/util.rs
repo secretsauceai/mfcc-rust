@@ -13,7 +13,7 @@ use ndarray::{Array, ArrayBase, Axis, Dimension, Slice};
 
 /// Note : Although tile may be used for broadcasting, it is strongly recommended to use numpy's broadcasting operations and functions. */
 
-pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: Vec<[usize; 2]>) -> Array<A, D>
+pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: &ArrayBase<S, D>) -> Array<A, D>
 where
     A: Clone,
     S: ndarray::Data<Elem = A>,
@@ -28,6 +28,8 @@ where
 /// and end of each axis.
 ///
 /// **Panics** if `arr.ndim() != pad_width.len()`.
+/// TODO: need to replace last arg in call: "edge"
+/// see: https://numpy.org/doc/stable/reference/generated/numpy.pad.html?highlight=pad#numpy.pad
 pub fn pad<A, S, D>(
     arr: &ArrayBase<S, D>,
     pad_width: Vec<[usize; 2]>,

@@ -16,7 +16,7 @@ import numpy as np
 from . import processing
 from scipy.fftpack import dct
 import math*/
-use ndarray::{Array1, Array2};
+use ndarray::{Array1, Array2, ArrayView1, ArrayViewMut1, ArrayViewMut2};
 
 /**
  * converting from frequency to Mel scale.
@@ -24,7 +24,7 @@ use ndarray::{Array1, Array2};
     :returns: The mel scale values(or a single mel).
 */
 pub fn frequency_to_mel(f: f64) -> f64 {
-    1127 * (1 + f / 700.).log()
+    1127. * (1. + f / 700.).ln()
 }
 //Note: may want to try this crate https://github.com/SuperFluffy/rust-expm
 /**
@@ -32,20 +32,28 @@ pub fn frequency_to_mel(f: f64) -> f64 {
     :param mel: The mel scale values(or a single mel).
     :returns: The frequency values(or a single frequency) in Hz.
 */
-pub fn mel_to_frequency(mel: Array2<f64>) -> Array2<f64> {
-    700 * (np.exp(mel / 1127.0) - 1)
+pub fn mel_to_frequency(mel: Array1<f64>) -> Array1<f64> {
+    mel.map(|v| 700. * ((v / 1127.0).exp() - 1.))
 }
 
-pub fn triangle(x: Array1<f64>, left: f32, middle: f32, right: f32) -> Array1<f64> {
-    let mut out = Array1::<f64>::zeros(x.shape());
-    out[x <= left] = 0;
-    out[x >= right] = 0;
+pub fn triangle(arr: ArrayViewMut1<f32>, x: Array1<f32>, left: f32, middle: f32, right: f32) {
+    //original function: https://github.com/astorfi/speechpy/blob/master/speechpy/functions.py#L44
 
-    let first_half = np.logical_and(left < x, x <= middle);
-    out[first_half] = (x[first_half] - left) / (middle - left);
-    let second_half = np.logical_and(middle <= x, x < right);
-    out[second_half] = (right - x[second_half]) / (right - middle);
-    out
+    //arr[x <= left] = 0;
+    //arr[x >= right] = 0;
+    arr.indexed_iter_mut().for_each(|(i, v)| {
+        if (left..right).contains(v) {
+            //TODO: fix range bounds to be exclusive, see https://github.com/rust-lang/rust/issues/37854
+            if v <= &mut middle {
+                *v = (x[i] - left) / (middle - left);
+            } //NOTE: depending on whether the double <= >= is intended or not, may be simplified to just else
+            if &mut middle <= v {
+                *v = (right - x[i]) / (right - middle);
+            }
+        } else {
+            *v = 0.0
+        }
+    });
 }
 /**
  *

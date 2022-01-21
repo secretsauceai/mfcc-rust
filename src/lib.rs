@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 mod feature;
 mod functions;
 mod processing;
