@@ -125,15 +125,16 @@ pub fn stack_frames(
 
     // Getting the indices of all frames.
     let indices = tile(
-        ndarray::Array::range(0, frame_sample_length),
+        &ndarray::Array::range(0, frame_sample_length),
         (numframes, 1),
     ) + tile(
         ndarray::Array::range(0, numframes * frame_stride, frame_stride),
         (frame_sample_length, 1),
     )
     .transpose();
-    indices = Array1::from::<i32>(indices);
 
+    //NOTE: I feel like some these next two lines might give us trouble
+    indices = Array1::<i32>::from(indices);
     // Extracting the frames based on the allocated indices.
     let frames = signal[indices];
 
