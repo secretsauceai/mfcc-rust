@@ -21,10 +21,10 @@ const __docformat__: &str = "reStructuredText";
 import numpy as np
 import math*/
 
-use std::ops::Mul;
+use std::ops::{Mul, Sub};
 
 use crate::util::{pad, tile};
-use ndarray::{s, Array1, Array2, Axis};
+use ndarray::{azip, s, Array1, Array2, Axis};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 //use realfft::RealFftPlanner;
 //use rustfft::FftPlanner;
@@ -319,10 +319,11 @@ fn cmvn(vec: Array2<f32>, variance_normalization: bool /*=False*/) -> Array2<f32
             array: The mean(or mean+variance) normalized feature vector.
 */
 fn cmvnw(
-    vec: Array1<f32>,
-    win_size: i32,                /*=301*/
+    vec: Array2<f32>,
+    win_size: usize,              /*=301*/
     variance_normalization: bool, /*=False*/
-) {
+) -> Array2<f32> {
+    //TODO: verify shape of output
     // Get the shapes
     let eps = 2f32.powf(-30.);
     let [rows, cols] = vec.shape();
@@ -335,27 +336,29 @@ fn cmvnw(
     let pad_size = ((win_size - 1) / 2) as usize;
     //NOTE: see https://github.com/rust-ndarray/ndarray/issues/823#issuecomment-942392888
     let vec_pad = pad(&vec, vec![[pad_size, pad_size], [0, 0]], "symmetric");
-    let mut mean_subtracted = ndarray::Array1::<f32>::zeros(vec.raw_dim());
+    let mut mean_subtracted = ndarray::Array2::<f32>::zeros(vec.raw_dim());
 
-    for i in 0..*rows {
-        let window = vec_pad.slice(s![i..i + win_size, ..]);
-        let window_mean = ndarray::ArrayBase::mean_axis(window, 0);
-        mean_subtracted.slice(s![i, ..]) = vec.slice(s![i, ..]) - window_mean;
-    }
+    (0..*rows).for_each(|i| {
+        let window = vec_pad.slice(s![i..i + win_size, ..]); //NOTE: we have to fix pad before fixing this error
+                                                             //TODO: preallocate window mean
+        let window_mean = window.mean_axis(Axis(0)).unwrap();
+        azip!((a in &mut mean_subtracted.slice_mut(s![i, ..]),&b in &vec.slice(s![i, ..]),c in &window_mean)*a=b-c); //this took way too long to figure out lol
+    });
 
     // Variance normalization
     if variance_normalization {
         // Initial definitions.
-        let variance_normalized = Array2::<f32>::zeros(vec.shape());
+        let variance_normalized = Array2::<f32>::zeros(vec.raw_dim());
         let vec_pad_variance = pad(mean_subtracted, ((pad_size, pad_size), (0, 0)), "symmetric");
 
         // Looping over all observations.
-        for i in 0..rows {
-            let window = vec_pad_variance.slice(s![i..i + win_size, ..]);
-            let window_variance = ndarray::ArrayBase::std_axis(window, 0);
-            variance_normalized.slice_mut(s![i, ..]) =
-                mean_subtracted.slice(s![i, ..]) / (window_variance + eps)
-        }
+        (0..*rows).for_each(|i| {
+            let window = vec_pad_variance.slice(s![i..i + win_size, ..]); //currently the return type is wrapped around &&str?
+            let window_variance = window.std_axis(Axis(0), 0.);
+            azip!((a in &mut variance_normalized.slice_mut(s![i, ..]),
+                &b in &mean_subtracted.slice(s![i, ..]) ,c in &window_variance) *a=b/(c+eps))
+            //error related to return type of pad
+        });
 
         variance_normalized
     } else {
