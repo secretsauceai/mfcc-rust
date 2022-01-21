@@ -156,6 +156,9 @@ fn mfcc(
     }
     return feature;
 }
+fn f_it(x: i32) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
+    Array1::<f64>::ones(x as usize)
+}
 /**
 * """Compute Mel-filterbank energy features from an audio signal.
 
@@ -190,14 +193,16 @@ fn mfe(
 ) -> (Array1<f64>, Array1<f64>) {
     // Convert to float
     //let signal = signal.type(float);
-    let f = |x: i32| Array1::<f64>::ones(x as usize);
+    let f = |x: i32| -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
+        Array1::<f64>::ones(x as usize)
+    };
     // Stack frames
     let frames = stack_frames(
         signal,
         sampling_frequency,
         frame_length,
         frame_stride,
-        &f,
+        f_it,
         false, /*=False*/
     );
 
