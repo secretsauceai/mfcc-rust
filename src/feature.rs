@@ -44,7 +44,7 @@ pub fn filterbanks(
     sampling_freq: f64,
     low_freq: Option<f64>,
     high_freq: Option<f64>,
-) -> ndarray::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::Dim<[usize; 2]>> {
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let high_freq = high_freq.unwrap_or(sampling_freq / 2.0);
     let low_freq = low_freq.unwrap_or(300.0);
     assert!(
@@ -77,13 +77,13 @@ pub fn filterbanks(
 
     // The triangular function for each filter
     for i in 0..num_filter {
-        let left = freq_index[i] as f32;
-        let middle = freq_index[i + 1] as f32;
-        let right = freq_index[i + 2] as f32;
-        let z = Array1::<f32>::linspace(left, right, right as usize - left as usize + 1);
+        let left = freq_index[i] as f64;
+        let middle = freq_index[i + 1] as f64;
+        let right = freq_index[i + 2] as f64;
+        let z = Array1::<f64>::linspace(left, right, right as usize - left as usize + 1);
 
         {
-            let mut s: ArrayViewMut1<f32> =
+            let mut s: ArrayViewMut1<f64> =
                 filterbank.slice_mut(s![i, left as usize..right as usize + 1]);
             triangle(s, z, left, middle, right);
         }
@@ -179,18 +179,18 @@ fn mfcc(
              array: features - the energy of fiterbank of size num_frames x num_filters. The energy of each frame: num_frames x 1
    */
 fn mfe(
-    signal: Array1<f32>,
+    signal: Array1<f64>,
     sampling_frequency: i32,
-    frame_length: f32,           /*=0.020*/
-    frame_stride: f32,           /*=0.01*/
+    frame_length: f64,           /*=0.020*/
+    frame_stride: f64,           /*=0.01*/
     num_filters: i32,            /*=40*/
     fft_length: i32,             /*=512*/
     low_frequency: f64,          /*=0*/
-    high_frequency: Option<f32>, /*None*/
-) -> (Array1<f32>, Array1<f32>) {
+    high_frequency: Option<f64>, /*None*/
+) -> (Array1<f64>, Array1<f64>) {
     // Convert to float
     //let signal = signal.type(float);
-    let f = |x: i32| Array1::<f32>::ones(x as usize);
+    let f = |x: i32| Array1::<f64>::ones(x as usize);
     // Stack frames
     let frames = stack_frames(
         signal,
@@ -202,7 +202,7 @@ fn mfe(
     );
 
     // getting the high frequency
-    let high_frequency = high_frequency.unwrap_or(sampling_frequency as f32 / 2);
+    let high_frequency = high_frequency.unwrap_or(sampling_frequency as f64 / 2);
 
     // calculation of the power sprectum
     let power_spectrum = crate::processing::power_spectrum(frames, fft_length);

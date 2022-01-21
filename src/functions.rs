@@ -36,7 +36,7 @@ pub fn mel_to_frequency(mel: Array1<f64>) -> Array1<f64> {
     mel.map(|v| 700. * ((v / 1127.0).exp() - 1.))
 }
 
-pub fn triangle(arr: ArrayViewMut1<f32>, x: Array1<f32>, left: f32, middle: f32, right: f32) {
+pub fn triangle(arr: ArrayViewMut1<f64>, x: Array1<f64>, left: f64, middle: f64, right: f64) {
     //original function: https://github.com/astorfi/speechpy/blob/master/speechpy/functions.py#L44
 
     //arr[x <= left] = 0;
