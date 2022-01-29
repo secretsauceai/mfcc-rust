@@ -12,7 +12,11 @@ use ndarray::{Array, ArrayBase, Axis, Dimension, Slice};
 /// If `A.ndim > d`, `reps` is promoted to `A`.ndim by pre-pending 1's to it. Thus for an `A` of shape (2, 3, 4, 5), a `reps` of (2, 2) is treated as (1, 1, 2, 2).
 
 /// Note : Although tile may be used for broadcasting, it is strongly recommended to use numpy's broadcasting operations and functions. */
-
+enum PadType {
+    Constant,
+    Symmetric,
+    Edge, //may add more
+}
 pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: &ArrayBase<S, D>) -> Array<A, D>
 where
     A: Clone,
@@ -33,15 +37,15 @@ where
 pub fn pad<A, S, D>(
     arr: &ArrayBase<S, D>,
     pad_width: Vec<[usize; 2]>,
-    pad_type: &str, //Enum?
+    const_value: A,
+    pad_type: PadType, //Enum?
 ) -> Array<A, D>
 where
     A: Clone,
     S: ndarray::Data<Elem = A>,
     D: Dimension,
 {
-    unimplemented!()
-    /*assert_eq!(
+    assert_eq!(
         arr.ndim(),
         pad_width.len(),
         "Array ndim must match length of `pad_width`."
@@ -67,6 +71,25 @@ where
         }
         // Copy the data from the original array.
         orig_portion.assign(arr);
+        match pad_type {
+            PadType::Constant => (),
+            PadType::Symmetric => {
+                /*
+                >>>a = [1, 2, 3, 4, 5]
+                >>>np.pad(a, (2, 3), 'symmetric')
+                array([2, 1, 1, 2, 3, 4, 5, 5, 4, 3])
+                */
+                todo!()
+            }
+            PadType::Edge => {
+                /*
+                >>>a = [1, 2, 3, 4, 5]
+                >>>np.pad(a, (2, 3), 'edge')
+                [out]: array([1, 1, 1, ..., 5, 5, 5])
+                */
+                todo!()
+            }
+        }
     }
-    padded*/
+    padded
 }
