@@ -33,14 +33,15 @@ where
 pub fn pad<A, S, D>(
     arr: &ArrayBase<S, D>,
     pad_width: Vec<[usize; 2]>,
-    const_value: A,
+    pad_type: &str, //Enum?
 ) -> Array<A, D>
 where
     A: Clone,
     S: ndarray::Data<Elem = A>,
     D: Dimension,
 {
-    assert_eq!(
+    unimplemented!()
+    /*assert_eq!(
         arr.ndim(),
         pad_width.len(),
         "Array ndim must match length of `pad_width`."
@@ -67,5 +68,5 @@ where
         // Copy the data from the original array.
         orig_portion.assign(arr);
     }
-    padded
+    padded*/
 }

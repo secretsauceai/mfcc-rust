@@ -21,10 +21,10 @@ const __docformat__: &str = "reStructuredText";
 import numpy as np
 import math*/
 
-use std::ops::Mul;
+use std::ops::{Mul, Sub};
 
 use crate::util::{pad, tile};
-use ndarray::{s, Array1, Array2, Axis};
+use ndarray::{azip, s, Array1, Array2, Axis};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 //use realfft::RealFftPlanner;
 //use rustfft::FftPlanner;
@@ -45,11 +45,11 @@ use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
     Returns:
            array: The pre-emphasized signal.
 */
-fn preemphasis(signal: Array1<f32>, shift: i32 /*1*/, cof: f32 /*=0.98*/) -> Array1<f32> {
+fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Array1<f64> {
     //Note: https://github.com/rust-ndarray/ndarray/issues/281
 
     //let rolled_signal = np.roll(signal, shift);
-    let mut rolled_signal = Array1::<f32>::zeros(signal.shape()[0]);
+    let mut rolled_signal = Array1::<f64>::zeros(signal.shape()[0]);
     {
         rolled_signal += &signal.slice(s![shift..]);
         rolled_signal -= &signal.slice(s![..-shift]);
@@ -73,15 +73,15 @@ fn preemphasis(signal: Array1<f32>, shift: i32 /*1*/, cof: f32 /*=0.98*/) -> Arr
             array: Stacked_frames-Array of frames of size (number_of_frames x frame_len).
 */
 pub fn stack_frames(
-    sig: Array1<f32>,
+    sig: Array1<f64>,
     sampling_frequency: i32,
-    frame_length: f32, /*=0.020*/
-    frame_stride: f32, /*=0.020*/
-    filter: fn(i32) -> Array1<f32>, /*=lambda x: np.ones(
+    frame_length: f64, /*=0.020*/
+    frame_stride: f64, /*=0.020*/
+    filter: fn(i32) -> Array1<f64>, /*=lambda x: np.ones(
                        (x,
                         ))*/
     zero_padding: bool, /*=True*/
-) -> Array2<f32> {
+) -> Array2<f64> {
     // Check dimension
     assert!(
         sig.ndim() == 1,
@@ -92,9 +92,9 @@ pub fn stack_frames(
     );
 
     // Initial necessary values
-    let length_signal = sig.len() as f32;
-    let frame_sample_length = (sampling_frequency as f32 * frame_length).round(); // Defined by the number of samples
-    let frame_stride = (sampling_frequency as f32 * frame_stride).round();
+    let length_signal = sig.len() as f64;
+    let frame_sample_length = (sampling_frequency as f64 * frame_length).round(); // Defined by the number of samples
+    let frame_stride = (sampling_frequency as f64 * frame_stride).round();
     let mut len_sig = 0;
     let mut numframes = 0;
 
@@ -110,7 +110,7 @@ pub fn stack_frames(
         );
 
         // Zero padding
-        len_sig = (numframes as f32 * frame_stride + frame_sample_length) as i32;
+        len_sig = (numframes as f64 * frame_stride + frame_sample_length) as i32;
         let additive_zeros = ndarray::ArrayBase::zeros((len_sig - length_signal,));
         ndarray::concatenate![Axis(0), sig, additive_zeros]
     } else {
@@ -119,21 +119,22 @@ pub fn stack_frames(
         numframes = ((length_signal - frame_sample_length) / frame_stride) as i32;
 
         // new length
-        let len_sig = ((numframes - 1) as f32 * frame_stride + frame_sample_length) as i32;
+        let len_sig = ((numframes - 1) as f64 * frame_stride + frame_sample_length) as i32;
         sig.slice_move(s![0..len_sig])
     };
 
     // Getting the indices of all frames.
     let indices = tile(
-        ndarray::Array::range(0, frame_sample_length),
+        &ndarray::Array::range(0, frame_sample_length),
         (numframes, 1),
     ) + tile(
         ndarray::Array::range(0, numframes * frame_stride, frame_stride),
         (frame_sample_length, 1),
     )
     .transpose();
-    indices = Array1::from::<i32>(indices);
 
+    //NOTE: I feel like some these next two lines might give us trouble
+    indices = Array1::<i32>::from(indices);
     // Extracting the frames based on the allocated indices.
     let frames = signal[indices];
 
@@ -155,7 +156,7 @@ pub fn stack_frames(
             If frames is an num_frames x sample_per_frame matrix, output
             will be num_frames x FFT_LENGTH.
 */
-fn fft_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2<f32> {
+fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
     //SPECTRUM_VECTOR = np.fft.rfft(frames, n = fft_points, axis = -1, norm = None)
     //in case of fire see https://github.com/secretsauceai/mfcc-rust/issues/2
     // let real2comp = RealFftPlanner::new()
@@ -165,8 +166,8 @@ fn fft_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2<f32> 
     // let mut spectrum_vector = real2comp.make_output_vec();
     // real2comp.process(&input_vec, &output_vec);
     let col_size = frames.shape()[1];
-    let mut handler = R2cFftHandler::<f32>::new(fft_points);
-    let mut spectrum_vector = Array2::<Complex<f32>>::zeros((fft_points / 2 + 1, col_size));
+    let mut handler = R2cFftHandler::<f64>::new(fft_points);
+    let mut spectrum_vector = Array2::<Complex<f64>>::zeros((fft_points / 2 + 1, col_size));
     ndfft_r2c(
         &frames,
         &mut spectrum_vector,
@@ -175,7 +176,7 @@ fn fft_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2<f32> 
     );
     //would this work?
     //spectrum_vector.abs()
-    spectrum_vector.map(|v: &Complex<f32>| -> f32 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() as f32 })
+    spectrum_vector.map(|v: &Complex<f64>| -> f64 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() as f64 })
 }
 
 /**
@@ -188,8 +189,8 @@ fn fft_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2<f32> 
             If frames is an num_frames x sample_per_frame matrix, output
             will be num_frames x fft_length.
 */
-pub fn power_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2<f32> {
-    fft_spectrum(frames, fft_points).map(|x| (1. / fft_points as f32) * *x)
+pub fn power_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
+    fft_spectrum(frames, fft_points).map(|x| (1. / fft_points as f64) * *x)
 }
 
 /**
@@ -206,11 +207,11 @@ pub fn power_spectrum(frames: Array2<f32>, fft_points: usize /*=512*/) -> Array2
            num_frames x fft_length.
 */
 fn log_power_spectrum(
-    frames: Array2<f32>,
+    frames: Array2<f64>,
     fft_points: usize, /*=512*/
     normalize: bool,   /*=True*/
-) -> Array2<f32> {
-    let mut mx = 1e-20 as f32; //had to do this because of trait constraints on max
+) -> Array2<f64> {
+    let mut mx = 1e-20 as f64; //had to do this because of trait constraints on max
     let log_power_spec = power_spectrum(frames, fft_points).map(|x| {
         if *x > 1e-20 {
             *x = 10. * x.log10();
@@ -238,12 +239,12 @@ This function the derivative features.
            array: Derivative feature vector - A NUMFRAMESxNUMFEATURES numpy
            array which is the derivative features along the features.
 */
-pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: usize) -> Array2<f32> {
+pub fn derivative_extraction(feat: Array2<f64>, DeltaWindows: usize) -> Array2<f64> {
     // Getting the shape of the vector.
     let [rows, cols] = feat.shape();
 
     // Difining the vector of differences.
-    let mut DIF = Array2::<f32>::zeros(feat.raw_dim());
+    let mut DIF = Array2::<f64>::zeros(feat.raw_dim());
     let Scale = 0.;
 
     // Pad only along features in the vector.
@@ -257,10 +258,10 @@ pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: usize) -> Array2<f
 
         let dif = FEAT
             .slice(s![.., offset + Range..offset + Range + cols])
-            .mul(Range as f32)
+            .mul(Range as f64)
             - FEAT.slice(s![.., offset - Range..offset - Range + cols]);
 
-        Scale += 2. * (Range as f32).powf(2.);
+        Scale += 2. * (Range as f64).powf(2.);
         DIF = DIF + dif;
     }
 
@@ -282,8 +283,8 @@ pub fn derivative_extraction(feat: Array2<f32>, DeltaWindows: usize) -> Array2<f
     Return:
           array: The mean(or mean+variance) normalized feature vector.
 */
-fn cmvn(vec: Array2<f32>, variance_normalization: bool /*=False*/) -> Array2<f32> {
-    let eps = 2.0f32.powf(-30.);
+fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
+    let eps = 2.0f64.powf(-30.);
     let [rows, cols] = vec.shape();
 
     // Mean calculation
@@ -319,12 +320,13 @@ fn cmvn(vec: Array2<f32>, variance_normalization: bool /*=False*/) -> Array2<f32
             array: The mean(or mean+variance) normalized feature vector.
 */
 fn cmvnw(
-    vec: Array1<f32>,
-    win_size: i32,                /*=301*/
+    vec: Array2<f64>,
+    win_size: usize,              /*=301*/
     variance_normalization: bool, /*=False*/
-) {
+) -> Array2<f64> {
+    //TODO: verify shape of output
     // Get the shapes
-    let eps = 2f32.powf(-30.);
+    let eps = 2f64.powf(-30.);
     let [rows, cols] = vec.shape();
 
     // Windows size must be odd.
@@ -335,27 +337,29 @@ fn cmvnw(
     let pad_size = ((win_size - 1) / 2) as usize;
     //NOTE: see https://github.com/rust-ndarray/ndarray/issues/823#issuecomment-942392888
     let vec_pad = pad(&vec, vec![[pad_size, pad_size], [0, 0]], "symmetric");
-    let mut mean_subtracted = ndarray::Array1::<f32>::zeros(vec.raw_dim());
+    let mut mean_subtracted = ndarray::Array2::<f64>::zeros(vec.raw_dim());
 
-    for i in 0..*rows {
-        let window = vec_pad.slice(s![i..i + win_size, ..]);
-        let window_mean = ndarray::ArrayBase::mean_axis(window, 0);
-        mean_subtracted.slice(s![i, ..]) = vec.slice(s![i, ..]) - window_mean;
-    }
+    (0..*rows).for_each(|i| {
+        let window = vec_pad.slice(s![i..i + win_size, ..]); //NOTE: we have to fix pad before fixing this error
+                                                             //TODO: preallocate window mean
+        let window_mean = window.mean_axis(Axis(0)).unwrap();
+        azip!((a in &mut mean_subtracted.slice_mut(s![i, ..]),&b in &vec.slice(s![i, ..]),c in &window_mean)*a=b-c); //this took way too long to figure out lol
+    });
 
     // Variance normalization
     if variance_normalization {
         // Initial definitions.
-        let variance_normalized = Array2::<f32>::zeros(vec.shape());
+        let variance_normalized = Array2::<f64>::zeros(vec.raw_dim());
         let vec_pad_variance = pad(mean_subtracted, ((pad_size, pad_size), (0, 0)), "symmetric");
 
         // Looping over all observations.
-        for i in 0..rows {
-            let window = vec_pad_variance.slice(s![i..i + win_size, ..]);
-            let window_variance = ndarray::ArrayBase::std_axis(window, 0);
-            variance_normalized.slice_mut(s![i, ..]) =
-                mean_subtracted.slice(s![i, ..]) / (window_variance + eps)
-        }
+        (0..*rows).for_each(|i| {
+            let window = vec_pad_variance.slice(s![i..i + win_size, ..]); //currently the return type is wrapped around &&str?
+            let window_variance = window.std_axis(Axis(0), 0.);
+            azip!((a in &mut variance_normalized.slice_mut(s![i, ..]),
+                &b in &mean_subtracted.slice(s![i, ..]) ,c in &window_variance) *a=b/(c+eps))
+            //error related to return type of pad
+        });
 
         variance_normalized
     } else {
