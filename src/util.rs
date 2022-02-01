@@ -12,7 +12,7 @@ use ndarray::{Array, ArrayBase, Axis, Dimension, Slice};
 /// If `A.ndim > d`, `reps` is promoted to `A`.ndim by pre-pending 1's to it. Thus for an `A` of shape (2, 3, 4, 5), a `reps` of (2, 2) is treated as (1, 1, 2, 2).
 
 /// Note : Although tile may be used for broadcasting, it is strongly recommended to use numpy's broadcasting operations and functions. */
-enum PadType {
+pub enum PadType {
     Constant,
     Symmetric,
     Edge, //may add more

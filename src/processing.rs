@@ -23,7 +23,7 @@ import math*/
 
 use std::ops::{Mul, Sub};
 
-use crate::util::{pad, tile};
+use crate::util::{pad, tile, PadType};
 use ndarray::{azip, s, Array1, Array2, Axis};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 //use realfft::RealFftPlanner;
@@ -248,7 +248,12 @@ pub fn derivative_extraction(feat: Array2<f64>, DeltaWindows: usize) -> Array2<f
     let Scale = 0.;
 
     // Pad only along features in the vector.
-    let FEAT = pad(&feat, vec![[0, 0], [DeltaWindows, DeltaWindows]], "edge");
+    let FEAT = pad(
+        &feat,
+        vec![[0, 0], [DeltaWindows, DeltaWindows]],
+        0.,
+        PadType::Edge,
+    );
     for i in 0..DeltaWindows {
         // Start index
         let offset = DeltaWindows;
@@ -336,7 +341,12 @@ fn cmvnw(
     // Padding and initial definitions
     let pad_size = ((win_size - 1) / 2) as usize;
     //NOTE: see https://github.com/rust-ndarray/ndarray/issues/823#issuecomment-942392888
-    let vec_pad = pad(&vec, vec![[pad_size, pad_size], [0, 0]], "symmetric");
+    let vec_pad = pad(
+        &vec,
+        vec![[pad_size, pad_size], [0, 0]],
+        0.,
+        PadType::Symmetric,
+    );
     let mut mean_subtracted = ndarray::Array2::<f64>::zeros(vec.raw_dim());
 
     (0..*rows).for_each(|i| {
@@ -350,7 +360,12 @@ fn cmvnw(
     if variance_normalization {
         // Initial definitions.
         let variance_normalized = Array2::<f64>::zeros(vec.raw_dim());
-        let vec_pad_variance = pad(mean_subtracted, ((pad_size, pad_size), (0, 0)), "symmetric");
+        let vec_pad_variance = pad(
+            &mean_subtracted,
+            vec![[pad_size, pad_size], [0, 0]],
+            0.,
+            PadType::Symmetric,
+        );
 
         // Looping over all observations.
         (0..*rows).for_each(|i| {
