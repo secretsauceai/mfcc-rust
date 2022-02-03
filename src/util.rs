@@ -109,7 +109,7 @@ where
     let mut b = a.clone();
     let mut inv_flag = false;
     let mut diag_flag = true;
-    let mut start = 0_usize;
+    let mut sub_len = 0_usize;
     let mut center_flag = false;
     let mut left_b: isize = 0;
     let mut right_b: isize = 0;
@@ -122,45 +122,49 @@ where
     let padded_dim = padded.raw_dim();
 
     for (ax, (&ax_len, &[pre_ax, post_ax])) in a.shape().iter().zip(&pad_width).enumerate() {
+        //the outer loops controls which axis we are tiling along
         if pre_ax == 0 && post_ax == 0 {
             continue;
         }
-        println!("loop {}", ax);
-        println!("ax_len: {}", ax_len);
+
         b.invert_axis(Axis(ax));
-        start = pre_ax % ax_len;
-        //if (start!=0){
+        //get the length of the leftover that won't fit a complete tile
+        sub_len = pre_ax % ax_len;
+        //if (sub_len!=0){
         //    todo!();
         //}
         if pre_ax > 0 {
-            //all "tiles" upto original axis
-            println!("pre_ax started");
-            for i in (0..(pre_ax / ax_len) as usize).rev() {
-                println!("inside loop{}", i);
+            //all "tiles" preceding original along axis
+
+            for i in (1..(pre_ax / ax_len) + 1 as usize).rev() {
                 let mut orig_portion = padded.view_mut();
                 for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
                     //draw a box around the ROI
-                    println!("lo: {}, hi: {}", lo, hi);
+
                     right_b = if hi > 0 {
                         padded_shape[axis] as isize - (hi + i * ax_len) as isize
                     } else {
                         padded_shape[axis] as isize - hi as isize
                     };
-                    println!("right_b: {}", right_b);
+
                     left_b = if lo > 0 {
                         lo as isize - (i * ax_len) as isize
                     } else {
                         lo as isize
                     };
-                    println!("left_b: {}", left_b);
+
                     if right_b - left_b != 0 {
                         orig_portion.slice_axis_inplace(Axis(axis), Slice::from(left_b..right_b));
                     }
-                    orig_portion.assign(&a);
+                    if i % 2 == 0 {
+                        orig_portion.assign(&a);
+                    } else {
+                        orig_portion.assign(&b);
+                    }
                 }
             }
-            println!("pre_ax ended");
-        } else if ax == 0 {
+        }
+        if ax == 0 {
             //only once for the actual original axis
 
             let mut orig_portion = padded.view_mut();
@@ -173,28 +177,32 @@ where
             orig_portion.assign(&a);
         }
         if post_ax > 0 {
-            println!("post_ax started");
-            for i in 1..(post_ax / ax_len) as usize {
+            //now for the tiles to the right of the original
+            for i in 1..(post_ax / ax_len) + 1 as usize {
                 let mut orig_portion = padded.view_mut();
                 for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
-                    println!("lo: {}, hi: {}", lo, hi);
                     right_b = if hi > 0 {
                         padded_shape[axis] as isize - (hi - i * ax_len) as isize
                     } else {
                         padded_shape[axis] as isize - hi as isize
                     };
-                    println!("right_b: {}", right_b);
+
                     left_b = if lo > 0 {
                         lo as isize + (i * ax_len) as isize
                     } else {
                         lo as isize
                     };
-                    println!("left_b: {}", left_b);
+
                     orig_portion.slice_axis_inplace(Axis(axis), Slice::from(left_b..right_b));
                 }
-                orig_portion.assign(&a);
+                if i % 2 == 0 {
+                    orig_portion.assign(&a);
+                } else {
+                    orig_portion.assign(&b);
+                }
             }
         }
+        //flip it back so it works for the next axis
         b.invert_axis(Axis(ax));
     }
     padded
