@@ -106,9 +106,9 @@ where
     A: Clone,
     D: Dimension,
 {
-    let mut b = a.clone();
-    let mut inv_flag = false;
-    let mut diag_flag = true;
+    let mut a_inv = a.clone();
+
+    //let mut diag_flag = true; //we don't need it
     let mut sub_len = 0_usize;
     let mut center_flag = false;
     let mut left_b: isize = 0;
@@ -120,22 +120,33 @@ where
     }
     let mut padded = Array::from_elem(padded_shape, const_value);
     let padded_dim = padded.raw_dim();
+    //right now this only handles the cross sections
+    //since the input is always 0 padded along one axis this
+    //works for our use case
 
     for (ax, (&ax_len, &[pre_ax, post_ax])) in a.shape().iter().zip(&pad_width).enumerate() {
         //the outer loops controls which axis we are tiling along
         if pre_ax == 0 && post_ax == 0 {
+            //diag_flag=false;
             continue;
         }
 
-        b.invert_axis(Axis(ax));
-        //get the length of the leftover that won't fit a complete tile
-        sub_len = pre_ax % ax_len;
-        //if (sub_len!=0){
-        //    todo!();
-        //}
+        a_inv.invert_axis(Axis(ax));
+
         if pre_ax > 0 {
             //all "tiles" preceding original along axis
 
+            //get the length of the leftover that won't fit a complete tile
+            sub_len = pre_ax % ax_len;
+            if sub_len != 0 {
+                for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
+                    if ax == axis {
+                        todo!();
+                    } else {
+                        todo!(); //I see you're a man of culture as well
+                    }
+                }
+            }
             for i in (1..(pre_ax / ax_len) + 1 as usize).rev() {
                 let mut orig_portion = padded.view_mut();
                 for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
@@ -159,7 +170,7 @@ where
                     if i % 2 == 0 {
                         orig_portion.assign(&a);
                     } else {
-                        orig_portion.assign(&b);
+                        orig_portion.assign(&a_inv);
                     }
                 }
             }
@@ -198,12 +209,23 @@ where
                 if i % 2 == 0 {
                     orig_portion.assign(&a);
                 } else {
-                    orig_portion.assign(&b);
+                    orig_portion.assign(&a_inv);
+                }
+            }
+            //check to see if there is any leftover
+            sub_len = post_ax % ax_len;
+            if sub_len != 0 {
+                for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
+                    if ax == axis {
+                        todo!();
+                    } else {
+                        todo!();
+                    }
                 }
             }
         }
         //flip it back so it works for the next axis
-        b.invert_axis(Axis(ax));
+        a_inv.invert_axis(Axis(ax));
     }
     padded
 }
