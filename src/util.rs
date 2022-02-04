@@ -139,16 +139,26 @@ where
             //get the length of the leftover that won't fit a complete tile
             sub_len = pre_ax % ax_len;
             if sub_len != 0 {
+                let mut portion = padded.view_mut();
                 for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
-                    if ax == axis {
-                        todo!();
+                    left_b = if ax == axis { 0 } else { lo as isize };
+                    right_b = if ax == axis {
+                        sub_len as isize
                     } else {
-                        todo!(); //I see you're a man of culture as well
+                        padded_shape[axis] as isize - hi as isize
+                    };
+                    if right_b - left_b != 0 {
+                        portion.slice_axis_inplace(Axis(axis), Slice::from(left_b..right_b));
                     }
+                }
+                if ((pre_ax / ax_len) + 2) % 2 == 0 {
+                    todo!();
+                } else {
+                    todo!();
                 }
             }
             for i in (1..(pre_ax / ax_len) + 1 as usize).rev() {
-                let mut orig_portion = padded.view_mut();
+                let mut portion = padded.view_mut();
                 for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
                     //draw a box around the ROI
 
@@ -165,12 +175,12 @@ where
                     };
 
                     if right_b - left_b != 0 {
-                        orig_portion.slice_axis_inplace(Axis(axis), Slice::from(left_b..right_b));
+                        portion.slice_axis_inplace(Axis(axis), Slice::from(left_b..right_b));
                     }
                     if i % 2 == 0 {
-                        orig_portion.assign(&a);
+                        portion.assign(&a);
                     } else {
-                        orig_portion.assign(&a_inv);
+                        portion.assign(&a_inv);
                     }
                 }
             }
@@ -216,11 +226,21 @@ where
             sub_len = post_ax % ax_len;
             if sub_len != 0 {
                 for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
-                    if ax == axis {
-                        todo!();
+                    left_b = if ax == axis {
+                        padded_shape[axis] as isize - sub_len as isize
                     } else {
-                        todo!();
-                    }
+                        lo as isize
+                    };
+                    right_b = if ax == axis {
+                        -1
+                    } else {
+                        padded_shape[axis] as isize - hi as isize
+                    };
+                }
+                if ((post_ax / ax_len) + 2) % 2 == 0 {
+                    todo!();
+                } else {
+                    todo!();
                 }
             }
         }
