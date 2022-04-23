@@ -28,13 +28,51 @@ enum EdgeColOp {
     Left,
     Right,
 }
-pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: &ArrayBase<S, D>) -> Array<A, D>
+///Tiles a function acording to
+pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: Vec<usize>) -> Array<A, D>
 where
     A: Clone,
     S: ndarray::Data<Elem = A>,
     D: Dimension,
 {
-    unimplemented!()
+    let d = reps.len();
+
+    //just clone the array if reps is all ones
+    let bail_flag = true;
+    for x in reps.iter() {
+        if x != 1 {
+            bail_flag = false;
+        }
+    }
+    if bail_flag {
+        return arr.clone();
+    }
+    let mut res = arr.clone();
+
+    if d < res.ndim() {
+        //TODO
+        //I have no idea what they are doing here lol
+        todo!();
+        //tup = (1,)*(c.ndim-d) + tup
+    }
+    //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
+    n = res.size();
+    if n > 0 {
+        for (dim_in, nrep) in zip(c.shape(), tup) {
+            if nrep != 1 {
+                //note on the negative value in reshape
+                //https://stackoverflow.com/questions/46281579/numpy-reshape-with-negative-values
+                //docs for numpy's ndarray reshape:
+                //https://numpy.org/doc/stable/reference/generated/numpy.ndarray.reshape.html
+                //docs for ndarrays reshape and into_shape
+                //https://docs.rs/ndarray/latest/ndarray/struct.Shape.html?search=reshape
+                //https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.into_shape
+                res = res.reshape(-1, n).repeat(nrep, 0)
+            }
+            n //= dim_in
+        }
+    }
+    return c.reshape(shape_out);
 }
 
 /// Pad the edges of an array with zeros.
