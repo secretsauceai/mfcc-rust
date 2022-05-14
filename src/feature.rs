@@ -15,6 +15,7 @@ Functions:
 */
 use crate::functions::{frequency_to_mel, mel_to_frequency, triangle, zero_handling};
 use crate::processing::{power_spectrum, stack_frames};
+use crate::util::ArrayLog;
 
 use ndarray::{concatenate, s, Array, Array1, Array2, ArrayBase, ArrayViewMut1, Axis, OwnedRepr};
 
@@ -126,7 +127,7 @@ fn mfcc(
     low_frequency: f64,          // =0,
     high_frequency: Option<f64>, // =None,
     dc_elimination: bool,        //True
-) {
+) -> Array1<f64>{
     let (feature, energy) = mfe(
         signal,
         sampling_frequency,
@@ -139,7 +140,7 @@ fn mfcc(
     );
 
     if feature.len() == 0 {
-        return ArrayBase::empty((0, num_cepstral));
+        return Array2::zeros((0i32, num_cepstral));
     }
     feature = feature.log();
 
@@ -152,7 +153,7 @@ fn mfcc(
     // replace first cepstral coefficient with log of frame energy for DC
     // elimination.
     if dc_elimination {
-        feature.slice(s![.., 0]) = energy.log();
+        feature.slice_mut(s![.., 0]) = energy.log();
     }
     return feature;
 }
@@ -211,9 +212,9 @@ fn mfe(
 
     // calculation of the power sprectum
     let power_spectrum = crate::processing::power_spectrum(frames, fft_length);
-    let coefficients = power_spectrum.shape[1];
+    let coefficients = power_spectrum.shape()[1];
     // this stores the total energy in each frame
-    let frame_energies = power_spectrum.sum_axis(1);
+    let frame_energies = power_spectrum.sum_axis(Axis(1));
 
     // Handling zero enegies.
     let frame_energies = zero_handling(frame_energies);
@@ -228,7 +229,7 @@ fn mfe(
     );
 
     // Filterbank energies
-    let features = power_spectrum.dot(filter_banks.transpose());
+    let features = power_spectrum.dot(&filter_banks.reversed_axes());
     let features = crate::functions::zero_handling(features);
 
     (features, frame_energies)
@@ -264,7 +265,7 @@ fn lmfe(
     fft_length: i32,             /*=512*/
     low_frequency: f64,          /*=0*/
     high_frequency: Option<f64>, /*None*/
-) {
+) -> Array1<f64> {
     let (feature, _frame_energies) = mfe(
         signal,
         sampling_frequency,

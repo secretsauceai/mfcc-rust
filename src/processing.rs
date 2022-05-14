@@ -302,7 +302,9 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
     // Variance normalization
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
-        let stdev_vec = tile(&stdev, rows, 1));
+
+        let stdev_vec = tile(&stdev, (rows, 1));
+
         mean_subtracted / (stdev_vec + eps)
     } else {
         mean_subtracted
