@@ -17,7 +17,10 @@ use crate::functions::{frequency_to_mel, mel_to_frequency, triangle, zero_handli
 use crate::processing::{power_spectrum, stack_frames};
 use crate::util::ArrayLog;
 
-use ndarray::{concatenate, s, Array, Array1, Array2, ArrayBase, ArrayViewMut1, Axis, OwnedRepr};
+use ndarray::{
+    concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayViewMut1, Axis, NewAxis,
+    OwnedRepr,
+};
 
 /*from __future__ import division
 import numpy as np
@@ -118,16 +121,16 @@ pub fn filterbanks(
 */
 fn mfcc(
     signal: Array1<f64>,
-    sampling_frequency: u32,
+    sampling_frequency: usize,
     frame_length: f64,           // =0.020,
     frame_stride: f64,           // =0.01,
-    num_cepstral: i32,           // =13,
-    num_filters: i32,            // =40,
-    fft_length: f64,             // =512,
+    num_cepstral: usize,         // =13,
+    num_filters: usize,          // =40,
+    fft_length: usize,           // =512,
     low_frequency: f64,          // =0,
     high_frequency: Option<f64>, // =None,
     dc_elimination: bool,        //True
-) -> Array1<f64>{
+) -> Array1<f64> {
     let (feature, energy) = mfe(
         signal,
         sampling_frequency,
@@ -140,7 +143,7 @@ fn mfcc(
     );
 
     if feature.len() == 0 {
-        return Array2::zeros((0i32, num_cepstral));
+        return Array2::zeros((0_usize, num_cepstral));
     }
     feature = feature.log();
 
@@ -157,7 +160,7 @@ fn mfcc(
     }
     return feature;
 }
-fn f_it(x: i32) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
+fn f_it(x: usize) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
     Array1::<f64>::ones(x as usize)
 }
 /**
@@ -184,11 +187,11 @@ fn f_it(x: i32) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
    */
 fn mfe(
     signal: Array1<f64>,
-    sampling_frequency: i32,
+    sampling_frequency: usize,
     frame_length: f64,           /*=0.020*/
     frame_stride: f64,           /*=0.01*/
-    num_filters: i32,            /*=40*/
-    fft_length: i32,             /*=512*/
+    num_filters: usize,          /*=40*/
+    fft_length: usize,           /*=512*/
     low_frequency: f64,          /*=0*/
     high_frequency: Option<f64>, /*None*/
 ) -> (Array1<f64>, Array1<f64>) {
@@ -221,11 +224,11 @@ fn mfe(
 
     // Extracting the filterbank
     let filter_banks = filterbanks(
-        num_filters,
+        num_filters as usize,
         coefficients,
-        sampling_frequency,
-        low_frequency,
-        high_frequency,
+        sampling_frequency.into(),
+        Some(low_frequency),
+        Some(high_frequency),
     );
 
     // Filterbank energies
@@ -258,11 +261,11 @@ fn mfe(
 */
 fn lmfe(
     signal: Array1<f64>,
-    sampling_frequency: i32,
+    sampling_frequency: usize,
     frame_length: f64,           /*=0.020*/
     frame_stride: f64,           /*=0.01*/
-    num_filters: i32,            /*=40*/
-    fft_length: i32,             /*=512*/
+    num_filters: usize,          /*=40*/
+    fft_length: usize,           /*=512*/
     low_frequency: f64,          /*=0*/
     high_frequency: Option<f64>, /*None*/
 ) -> Array1<f64> {
@@ -287,17 +290,19 @@ fn lmfe(
     Return:
           array: The feature cube vector which contains the static, first and second derivative features of size: N x M x 3
 */
-fn extract_derivative_feature(feature: Array2<f64>) -> Array2<f64> {
+fn extract_derivative_feature(feature: Array2<f64>) -> Array3<f64> {
     let first_derivative_feature = crate::processing::derivative_extraction(feature, 2);
     let second_derivative_feature =
         crate::processing::derivative_extraction(first_derivative_feature, 2);
 
     // Creating the future cube for each file
+    //Note about numpy syntax in equivalent function
+    //https://stackoverflow.com/a/1408435/11019565
     let feature_cube = concatenate![
         Axis(2),
-        feature.slice(s![.., .., None]),
-        first_derivative_feature.slice(s![.., .., None]),
-        second_derivative_feature.slice(s![.., .., None])
+        feature.slice(s![.., .., NewAxis]),
+        first_derivative_feature.slice(s![.., .., NewAxis]),
+        second_derivative_feature.slice(s![.., .., NewAxis])
     ];
 
     feature_cube

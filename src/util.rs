@@ -39,7 +39,7 @@ where
 
     //just clone the array if reps is all ones
     let bail_flag = true;
-    for x in reps.iter() {
+    for &x in reps.iter() {
         if x != 1 {
             bail_flag = false;
         }
@@ -67,7 +67,7 @@ where
     }
     //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
     let shape_out = Zip(res.shape(), reps).for_each(|s, t| s * t).collect();
-    n = res.size();
+    let n = res.size();
     if n > 0 {
         //what's going on if reps is larger than shape
         Zip(res.shape(), reps)
@@ -97,6 +97,8 @@ where
 /// **Panics** if `arr.ndim() != pad_width.len()`.
 /// TODO: need to replace last arg in call: "edge"
 /// see: https://numpy.org/doc/stable/reference/generated/numpy.pad.html?highlight=pad#numpy.pad
+/// TODO: currently having issue with the generic arguments, may need to change
+/// potentially relevant SO post: https://stackoverflow.com/questions/61758934/how-can-i-write-a-generic-function-that-takes-either-an-ndarray-array-or-arrayvi
 pub fn pad<S, A, D>(
     arr: &Array<A, D>,
     pad_width: Vec<[usize; 2]>,
@@ -104,8 +106,9 @@ pub fn pad<S, A, D>(
     pad_type: PadType, //Enum?
 ) -> Array<A, D>
 where
-    S: ndarray::Data<Elem = A>,
     A: Clone,
+    S: ndarray::Data<Elem = A>,
+
     D: Dimension,
 {
     assert_eq!(
@@ -396,13 +399,13 @@ fn set_edge<A, D>(
 }
 
 /// A simple trait to implement log operation for matrixes
-pub trait ArrayLog<A: rustdct::num_traits::real::Real, I:ndarray::Dimension> {
+pub trait ArrayLog<A: rustdct::num_traits::real::Real, I: ndarray::Dimension> {
     fn log(self) -> Array<A, I>;
 }
 
-impl<A: rustdct::num_traits::real::Real, I:ndarray::Dimension> ArrayLog<A, I> for Array<A, I> {
+impl<A: rustdct::num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<A, I> {
     fn log(self) -> Array<A, I> {
-        self.map_inplace(|n|*n=(*n).ln());
+        self.map_inplace(|n| *n = (*n).ln());
         self
     }
 }

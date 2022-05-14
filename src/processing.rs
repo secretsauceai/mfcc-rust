@@ -56,7 +56,7 @@ fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Arr
     }
     signal - (cof * rolled_signal)
 }
-
+//TODO: change the return type, the returned matrix will have varying dimensions
 /**
  * Frame a signal into overlapping frames.
     Args:
@@ -74,10 +74,10 @@ fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Arr
 */
 pub fn stack_frames(
     sig: Array1<f64>,
-    sampling_frequency: i32,
+    sampling_frequency: usize,
     frame_length: f64, /*=0.020*/
     frame_stride: f64, /*=0.020*/
-    filter: fn(i32) -> Array1<f64>, /*=lambda x: np.ones(
+    filter: fn(usize) -> Array1<f64>, /*=lambda x: np.ones(
                        (x,
                         ))*/
     zero_padding: bool, /*=True*/
@@ -92,54 +92,59 @@ pub fn stack_frames(
     );
 
     // Initial necessary values
-    let length_signal = sig.len() as f64;
-    let frame_sample_length = (sampling_frequency as f64 * frame_length).round(); // Defined by the number of samples
+    let length_signal = sig.len();
+    let frame_sample_length = (sampling_frequency as f64 * frame_length).round() as usize; // Defined by the number of samples
     let frame_stride = (sampling_frequency as f64 * frame_stride).round();
-    let mut len_sig = 0;
-    let mut numframes = 0;
+    let mut len_sig: usize = 0;
+    let mut numframes: usize = 0;
 
     //TODO: once the code is working simplify this section, handle sig directly and
-    //let the bolow if else declare the last index
+    //let the below if else declare the last index
     // Zero padding is done for allocating space for the last frame.
     let signal = if zero_padding {
         // Calculation of number of frames
-        numframes = ((length_signal - frame_sample_length) / frame_stride).ceil() as i32;
+        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride).ceil() as usize;
         println!(
             "{} {} {} {}",
             numframes, length_signal, frame_sample_length, frame_stride
         );
 
         // Zero padding
-        len_sig = (numframes as f64 * frame_stride + frame_sample_length) as i32;
-        let additive_zeros = ndarray::ArrayBase::zeros((len_sig - length_signal,));
+        len_sig = (numframes as f64 * frame_stride) as usize + frame_sample_length;
+        let additive_zeros = ndarray::ArrayBase::zeros(((len_sig - length_signal) as usize,));
         ndarray::concatenate![Axis(0), sig, additive_zeros]
     } else {
         // No zero padding! The last frame which does not have enough
         // samples(remaining samples <= frame_sample_length), will be dropped!
-        numframes = ((length_signal - frame_sample_length) / frame_stride) as i32;
+        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride) as usize;
 
         // new length
-        let len_sig = ((numframes - 1) as f64 * frame_stride + frame_sample_length) as i32;
+        let len_sig =
+            ((numframes - 1) as f64 * frame_stride) as usize + frame_sample_length as usize;
         sig.slice_move(s![0..len_sig])
     };
 
     // Getting the indices of all frames.
     let indices = tile(
-        &ndarray::Array::range(0, frame_sample_length),
-        (numframes, 1),
+        &ndarray::Array::range(0., frame_sample_length as f64, 1.),
+        vec![numframes, 1],
     ) + tile(
-        &ndarray::Array::range(0, numframes * frame_stride, frame_stride),
-        (frame_sample_length, 1),
+        &ndarray::Array::range(0., numframes as f64 * frame_stride, frame_stride),
+        vec![frame_sample_length, 1],
     )
-    .transpose();
+    .t();
+    let indices = indices.mapv(|v| v as usize);
 
-    //NOTE: I feel like some these next two lines might give us trouble
-    indices = Array1::<i32>::from(indices);
     // Extracting the frames based on the allocated indices.
-    let frames = signal[indices];
+    let frames = indices.map(|i| {
+        *signal.get(*i).expect(&format!(
+            "code paniced when trying to access element {} of ndarray signal.\n\n signal:\n{}",
+            i, signal
+        ))
+    });
 
-    // Apply the windows function
-    let window = tile(filter(frame_sample_length), (numframes, 1));
+    let window = tile(&filter(frame_sample_length), vec![numframes, 1]);
+    //NOTE: frames is Nx1, window is Mx1, so result is MxN
     frames * window // Extracted frames
 }
 
@@ -294,7 +299,7 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
 
     // Mean calculation
     let norm = &vec.mean_axis(Axis(0)).unwrap();
-    let norm_vec = tile(norm, (rows, 1));
+    let norm_vec = tile(norm, vec![*rows, 1]);
 
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
@@ -303,7 +308,7 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
 
-        let stdev_vec = tile(&stdev, (rows, 1));
+        let stdev_vec = tile(&stdev, vec![*rows, 1]);
 
         mean_subtracted / (stdev_vec + eps)
     } else {
