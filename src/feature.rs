@@ -211,7 +211,7 @@ fn mfe(
     );
 
     // getting the high frequency
-    let high_frequency = high_frequency.unwrap_or(sampling_frequency as f64 / 2);
+    let high_frequency = high_frequency.unwrap_or(sampling_frequency as f64 / 2.);
 
     // calculation of the power sprectum
     let power_spectrum = crate::processing::power_spectrum(frames, fft_length);
@@ -226,7 +226,7 @@ fn mfe(
     let filter_banks = filterbanks(
         num_filters as usize,
         coefficients,
-        sampling_frequency.into(),
+        sampling_frequency as f64,
         Some(low_frequency),
         Some(high_frequency),
     );

@@ -24,7 +24,7 @@ import math*/
 use std::ops::{Mul, Sub};
 
 use crate::util::{pad, tile, PadType};
-use ndarray::{azip, s, Array1, Array2, Axis, Dim};
+use ndarray::{azip, s, Array, Array1, Array2, Axis, Dim, Dimension};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 //use realfft::RealFftPlanner;
 //use rustfft::FftPlanner;
@@ -72,7 +72,7 @@ fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Arr
     Returns:
             array: Stacked_frames-Array of frames of size (number_of_frames x frame_len).
 */
-pub fn stack_frames(
+pub fn stack_frames<D>(
     sig: Array1<f64>,
     sampling_frequency: usize,
     frame_length: f64, /*=0.020*/
@@ -81,7 +81,10 @@ pub fn stack_frames(
                        (x,
                         ))*/
     zero_padding: bool, /*=True*/
-) -> Array2<f64> {
+) -> Array<f64, D>
+where
+    D: Dimension,
+{
     // Check dimension
     assert!(
         sig.ndim() == 1,
