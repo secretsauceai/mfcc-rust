@@ -1,6 +1,6 @@
 use ndarray::{
     Array, Array2, ArrayBase, ArrayView, ArrayView2, ArrayViewMut, ArrayViewMut2, Axis, Dim,
-    Dimension, Slice,
+    Dimension, Shape, Slice, Zip,
 };
 
 //for all the stuff that doesn't exist
@@ -28,13 +28,65 @@ enum EdgeColOp {
     Left,
     Right,
 }
-pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: &ArrayBase<S, D>) -> Array<A, D>
+///Tiles a function acording to
+pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: Vec<usize>) -> Array<A, D>
 where
     A: Clone,
     S: ndarray::Data<Elem = A>,
     D: Dimension,
 {
-    unimplemented!()
+    let num_of_reps = reps.len();
+
+    //just clone the array if reps is all ones
+    let bail_flag = true;
+    for x in reps.iter() {
+        if x != 1 {
+            bail_flag = false;
+        }
+    }
+    if bail_flag {
+        return arr.clone();
+    }
+    //TODO: this may need to be changed, numpy is avoiding allocations unless
+    //necessary. This may not be possible in rust
+    //see the line: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1246
+    // and SO post: https://stackoverflow.com/a/27609904/11019565
+    let mut res = arr.clone();
+
+    //so this seems to pad the number of reps so that the later zip doesn't lose
+    //data, but still not getting how this
+    if num_of_reps < res.ndim() {
+        // in case of fire: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1250
+        ////tup = (1,)*(res.ndim()-num_of_reps) + tup
+        //a tuple multiplied by `n` is that same tuple repeated `n` times
+        //c is a "copy" of the input array
+        //+ concatenates tuples in python
+        let mut tmp = vec![1; res.ndim() - num_of_reps];
+        tmp.push(reps);
+        reps = tmp;
+    }
+    //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
+    let shape_out = Zip(res.shape(), reps).for_each(|s, t| s * t).collect();
+    n = res.size();
+    if n > 0 {
+        //what's going on if reps is larger than shape
+        Zip(res.shape(), reps)
+            .into_iter()
+            .for_each(|(dim_in, nrep)| {
+                if nrep != 1 {
+                    //note on the negative value in reshape
+                    //https://stackoverflow.com/questions/46281579/numpy-reshape-with-negative-values
+                    //docs for numpy's ndarray reshape:
+                    //https://numpy.org/doc/stable/reference/generated/numpy.ndarray.reshape.html
+                    //docs for ndarrays reshape and into_shape
+                    //https://docs.rs/ndarray/latest/ndarray/struct.Shape.html?search=reshape
+                    //https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.into_shape
+                    res = res.reshape(Shape(-1, n)).repeat(nrep, 0)
+                }
+                n //= dim_in
+            });
+    }
+    return c.reshape(shape_out);
 }
 
 /// Pad the edges of an array with zeros.
