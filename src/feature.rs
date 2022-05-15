@@ -18,8 +18,8 @@ use crate::processing::{power_spectrum, stack_frames};
 use crate::util::ArrayLog;
 
 use ndarray::{
-    concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayViewMut1, Axis, NewAxis,
-    OwnedRepr,
+    concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayViewMut1, Axis, Dimension,
+    NewAxis, OwnedRepr,
 };
 
 /*from __future__ import division
@@ -119,6 +119,10 @@ pub fn filterbanks(
     Returns:
         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
 */
+//TODO: verify return type after running, may need to
+//convert to dynamic dimensions (IxDyn) if input varies between
+//1 and 2d output
+// see https://docs.rs/ndarray/latest/ndarray/type.IxDyn.html
 fn mfcc(
     signal: Array1<f64>,
     sampling_frequency: usize,
@@ -130,7 +134,9 @@ fn mfcc(
     low_frequency: f64,          // =0,
     high_frequency: Option<f64>, // =None,
     dc_elimination: bool,        //True
-) -> Array1<f64> {
+) -> Array2<f64>
+where
+{
     let (feature, energy) = mfe(
         signal,
         sampling_frequency,
@@ -143,15 +149,26 @@ fn mfcc(
     );
 
     if feature.len() == 0 {
-        return Array2::zeros((0_usize, num_cepstral));
+        return Array::<f64, _>::zeros((0_usize, num_cepstral));
     }
     feature = feature.log();
 
-    feature = rustdct::DctPlanner::new()
-        .plan_dct2(
-            feature, /*type=*/ 2, /*axis=*/ -1, /*norm=*/ "ortho",
-        ) //#TODO: fix this
-        .slice(s![.., ..num_cepstral]);
+    //link to og code:
+    //https://github.com/astorfi/speechpy/blob/2.4/speechpy/feature.py#L147
+    //function dct docs:
+    //https://docs.scipy.org/doc/scipy/reference/generated/scipy.fftpack.dct.html
+    //param explanations:
+    //1. feature: actual matrix being transformed
+    //2. type=2: the dct type, in this case 2.
+    //3. axis=-1: apply along last axis of feature
+    //4. norm="ortho": when used with dct type 2, applies a scaling factor
+
+    //#TODO: fix this
+    //need to switch to rustfft, provide len of last axis specifically
+    let mut dct_it = rustdct::DctPlanner::new().plan_dct2(feature.len());
+    //need to check how to specify axis of transformation
+    dct_it.process_dct2(feature);
+    feature.slice(s![.., ..num_cepstral]);
 
     // replace first cepstral coefficient with log of frame energy for DC
     // elimination.
@@ -194,7 +211,7 @@ fn mfe(
     fft_length: usize,           /*=512*/
     low_frequency: f64,          /*=0*/
     high_frequency: Option<f64>, /*None*/
-) -> (Array1<f64>, Array1<f64>) {
+) -> (Array2<f64>, Array1<f64>) {
     // Convert to float
     //let signal = signal.type(float);
     let f = |x: i32| -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
@@ -268,7 +285,7 @@ fn lmfe(
     fft_length: usize,           /*=512*/
     low_frequency: f64,          /*=0*/
     high_frequency: Option<f64>, /*None*/
-) -> Array1<f64> {
+) -> Array2<f64> {
     let (feature, _frame_energies) = mfe(
         signal,
         sampling_frequency,

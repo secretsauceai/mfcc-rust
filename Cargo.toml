@@ -10,5 +10,5 @@ ndarray="^0.15"
 rustdct="^0.7"
 #rustfft="^6.0"
 #realfft = "^2.0.1"
-ndrustfft = "^0.2.1"
+ndrustfft = "^0.3"
 

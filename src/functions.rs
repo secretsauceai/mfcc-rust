@@ -16,7 +16,7 @@ import numpy as np
 from . import processing
 from scipy.fftpack import dct
 import math*/
-use ndarray::{Array1, Array2, ArrayView1, ArrayViewMut1, ArrayViewMut2};
+use ndarray::{Array, Array1, Array2, ArrayView1, ArrayViewMut1, ArrayViewMut2, Dimension};
 
 /**
  * converting from frequency to Mel scale.
@@ -62,6 +62,9 @@ pub fn triangle(arr: ArrayViewMut1<f64>, x: Array1<f64>, left: f64, middle: f64,
     :param x: The vector.
     :return: The vector with zeros substituted with epsilon values.
 */
-pub fn zero_handling(x: Array1<f64>) -> Array1<f64> {
+pub fn zero_handling<D>(x: Array<f64, D>) -> Array<f64, D>
+where
+    D: Dimension,
+{
     x.mapv(|x| if x == 0.0 { std::f64::EPSILON } else { x })
 }
