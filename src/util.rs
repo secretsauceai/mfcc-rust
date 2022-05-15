@@ -29,11 +29,12 @@ enum EdgeColOp {
     Right,
 }
 ///Tiles a function acording to
-pub fn tile<A, S, D>(arr: &ArrayBase<S, D>, reps: Vec<usize>) -> Array<A, D>
+pub fn tile<A, D1, D2>(arr: &Array<A, D1>, reps: Vec<usize>) -> Array<A, D2>
 where
     A: Clone,
-    S: ndarray::Data<Elem = A>,
-    D: Dimension,
+
+    D1: Dimension,
+    D2: Dimension,
 {
     let num_of_reps = reps.len();
 

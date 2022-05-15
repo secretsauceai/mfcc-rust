@@ -24,7 +24,7 @@ import math*/
 use std::ops::{Mul, Sub};
 
 use crate::util::{pad, tile, PadType};
-use ndarray::{azip, s, Array, Array1, Array2, Axis, Dim, Dimension};
+use ndarray::{azip, s, Array, Array1, Array2, Axis, Dim, Dimension, Ix1, Ix2};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 //use realfft::RealFftPlanner;
 //use rustfft::FftPlanner;
@@ -72,7 +72,7 @@ fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Arr
     Returns:
             array: Stacked_frames-Array of frames of size (number_of_frames x frame_len).
 */
-pub fn stack_frames<D>(
+pub fn stack_frames(
     sig: Array1<f64>,
     sampling_frequency: usize,
     frame_length: f64, /*=0.020*/
@@ -81,10 +81,7 @@ pub fn stack_frames<D>(
                        (x,
                         ))*/
     zero_padding: bool, /*=True*/
-) -> Array<f64, D>
-where
-    D: Dimension,
-{
+) -> Array2<f64> {
     // Check dimension
     assert!(
         sig.ndim() == 1,
@@ -114,7 +111,8 @@ where
 
         // Zero padding
         len_sig = (numframes as f64 * frame_stride) as usize + frame_sample_length;
-        let additive_zeros = ndarray::ArrayBase::zeros(((len_sig - length_signal) as usize,));
+        let additive_zeros =
+            ndarray::Array::<f64, Ix1>::zeros(((len_sig - length_signal) as usize,));
         ndarray::concatenate![Axis(0), sig, additive_zeros]
     } else {
         // No zero padding! The last frame which does not have enough
@@ -128,10 +126,10 @@ where
     };
 
     // Getting the indices of all frames.
-    let indices = tile(
+    let indices = tile::<f64, Ix1, Ix2>(
         &ndarray::Array::range(0., frame_sample_length as f64, 1.),
         vec![numframes, 1],
-    ) + tile(
+    ) + tile::<f64, Ix1, Ix2>(
         &ndarray::Array::range(0., numframes as f64 * frame_stride, frame_stride),
         vec![frame_sample_length, 1],
     )
@@ -146,7 +144,7 @@ where
         ))
     });
 
-    let window = tile(&filter(frame_sample_length), vec![numframes, 1]);
+    let window = tile::<f64, Ix1, Ix2>(&filter(frame_sample_length), vec![numframes, 1]);
     //NOTE: frames is Nx1, window is Mx1, so result is MxN
     frames * window // Extracted frames
 }
@@ -302,7 +300,7 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
 
     // Mean calculation
     let norm = &vec.mean_axis(Axis(0)).unwrap();
-    let norm_vec = tile(norm, vec![*rows, 1]);
+    let norm_vec = tile::<f64, Ix1, Ix2>(norm, vec![*rows, 1]);
 
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
@@ -311,7 +309,7 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
 
-        let stdev_vec = tile(&stdev, vec![*rows, 1]);
+        let stdev_vec = tile::<f64, Ix1, Ix2>(&stdev, vec![*rows, 1]);
 
         mean_subtracted / (stdev_vec + eps)
     } else {
