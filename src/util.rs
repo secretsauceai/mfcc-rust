@@ -66,12 +66,18 @@ where
         tmp.push(reps);
         reps = tmp;
     }
+    //NOTE: need to revisit this section, also if we can determine the type of shape out
+    //we may be able to reduce the two zips to one.
     //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
-    let shape_out = Zip(res.shape(), reps).for_each(|s, t| s * t).collect();
+    let shape_out = Zip::from(res.shape())
+        .and(&reps)
+        .for_each(|s, t| s * t)
+        .collect();
     let n = res.size();
     if n > 0 {
         //what's going on if reps is larger than shape
-        Zip(res.shape(), reps)
+        Zip::from(res.shape())
+            .and(&reps)
             .into_iter()
             .for_each(|(dim_in, nrep)| {
                 if nrep != 1 {

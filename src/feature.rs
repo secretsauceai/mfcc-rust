@@ -21,6 +21,7 @@ use ndarray::{
     concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayViewMut1, Axis, Dimension,
     NewAxis, OwnedRepr,
 };
+use ndrustfft::{nddct2, DctHandler};
 
 /*from __future__ import division
 import numpy as np
@@ -152,7 +153,8 @@ where
         return Array::<f64, _>::zeros((0_usize, num_cepstral));
     }
     feature = feature.log();
-
+    let feature_axis_len = feature.shape()[1];
+    let mut transformed_feature = Array2::<f64>::zeros(feature.raw_dim());
     //link to og code:
     //https://github.com/astorfi/speechpy/blob/2.4/speechpy/feature.py#L147
     //function dct docs:
@@ -165,9 +167,12 @@ where
 
     //#TODO: fix this
     //need to switch to rustfft, provide len of last axis specifically
-    let mut dct_it = rustdct::DctPlanner::new().plan_dct2(feature.len());
+    let mut dct_handler: DctHandler<f64> = DctHandler::new(feature_axis_len);
     //need to check how to specify axis of transformation
-    dct_it.process_dct2(feature);
+    nddct2(&feature, &mut transformed_feature, &mut dct_handler, 1);
+    //TODO: features still needs to be normalized
+    //https://docs.scipy.org/doc/scipy/reference/generated/scipy.fftpack.dct.html#:~:text=2N)-,If%20norm%3D%27ortho%27%2C%20y%5Bk%5D%20is%20multiplied%20by%20a%20scaling%20factor%20f,-f%3D%7B
+    //transformed_feature.normalize!
     feature.slice(s![.., ..num_cepstral]);
 
     // replace first cepstral coefficient with log of frame energy for DC
