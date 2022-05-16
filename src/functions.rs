@@ -16,7 +16,7 @@ import numpy as np
 from . import processing
 from scipy.fftpack import dct
 import math*/
-use ndarray::{Array, Array1, Array2, ArrayView1, ArrayViewMut1, ArrayViewMut2, Dimension};
+use ndarray::{Array, Array1, ArrayViewMut1, Dimension};
 
 /**
  * converting from frequency to Mel scale.

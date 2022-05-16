@@ -21,13 +21,11 @@ const __docformat__: &str = "reStructuredText";
 import numpy as np
 import math*/
 
-use std::ops::{Mul, Sub};
+use std::ops::Mul;
 
 use crate::util::{pad, tile, PadType};
-use ndarray::{azip, s, Array, Array1, Array2, Axis, Dim, Dimension, Ix1, Ix2};
+use ndarray::{azip, s, Array1, Array2, Axis, Dimension, Ix1, Ix2};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
-//use realfft::RealFftPlanner;
-//use rustfft::FftPlanner;
 
 // 1.4 becomes 1 and 1.6 becomes 2. special case: 1.5 becomes 2.
 // fn round_half_up(number: i32) -> i32 {

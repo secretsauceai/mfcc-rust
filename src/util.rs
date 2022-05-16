@@ -1,7 +1,4 @@
-use ndarray::{
-    Array, Array2, ArrayBase, ArrayView, ArrayView2, ArrayViewMut, ArrayViewMut2, Axis, Dim,
-    Dimension, Shape, Slice, Zip,
-};
+use ndarray::{Array, ArrayView, ArrayViewMut, Axis, Dimension, Slice, Zip};
 
 //for all the stuff that doesn't exist
 
@@ -39,6 +36,7 @@ where
     let num_of_reps = reps.len();
 
     //just clone the array if reps is all ones
+    let mut res = arr.clone();
     let bail_flag = true;
     for &x in reps.iter() {
         if x != 1 {
@@ -46,13 +44,12 @@ where
         }
     }
     if bail_flag {
-        return arr.clone();
+        return res;
     }
     //TODO: this may need to be changed, numpy is avoiding allocations unless
     //necessary. This may not be possible in rust
     //see the line: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1246
     // and SO post: https://stackoverflow.com/a/27609904/11019565
-    let mut res = arr.clone();
 
     //so this seems to pad the number of reps so that the later zip doesn't lose
     //data, but still not getting how this
@@ -88,7 +85,7 @@ where
                     //docs for ndarrays reshape and into_shape
                     //https://docs.rs/ndarray/latest/ndarray/struct.Shape.html?search=reshape
                     //https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.into_shape
-                    res = res.reshape(Shape(-1, n)).repeat(nrep, 0)
+                    res = res.reshape([-1, n]).repeat(nrep, 0)
                 }
                 n //= dim_in
             });
@@ -405,11 +402,11 @@ fn set_edge<A, D>(
 }
 
 /// A simple trait to implement log operation for matrixes
-pub trait ArrayLog<A: rustdct::num_traits::real::Real, I: ndarray::Dimension> {
+pub trait ArrayLog<A: num_traits::real::Real, I: ndarray::Dimension> {
     fn log(self) -> Array<A, I>;
 }
 
-impl<A: rustdct::num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<A, I> {
+impl<A: num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<A, I> {
     fn log(self) -> Array<A, I> {
         self.map_inplace(|n| *n = (*n).ln());
         self

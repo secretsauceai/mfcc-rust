@@ -14,7 +14,7 @@ Functions:
         function in the ``processing`` module.
 */
 use crate::functions::{frequency_to_mel, mel_to_frequency, triangle, zero_handling};
-use crate::processing::{power_spectrum, stack_frames};
+use crate::processing::stack_frames;
 use crate::util::ArrayLog;
 
 use ndarray::{
@@ -178,7 +178,14 @@ where
     // replace first cepstral coefficient with log of frame energy for DC
     // elimination.
     if dc_elimination {
-        feature.slice_mut(s![.., 0]) = energy.log();
+        //>>>x = np.array([[1,2,3,4],[5,6,7,8]])
+        //>>>x[:,0]
+        //array([1, 5])
+        //TODO: need to verify the shapes for these two match
+        let mut replace_me = transformed_feature.slice_mut(s![.., 0]);
+        {
+            replace_me.assign(&energy.log())
+        }
     }
     return feature;
 }
