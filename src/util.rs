@@ -1,4 +1,9 @@
-use ndarray::{Array, ArrayView, ArrayViewMut, Axis, Dimension, Slice, Zip};
+use std::fmt::format;
+
+use ndarray::{
+    azip, Array, Array1, Array2, ArrayBase, ArrayD, ArrayView, ArrayViewMut, Axis, Dim, DimMax,
+    Dimension, IntoDimension, IxDyn, IxDynImpl, OwnedRepr, Slice, Zip,
+};
 
 //for all the stuff that doesn't exist
 
@@ -25,25 +30,34 @@ enum EdgeColOp {
     Left,
     Right,
 }
-///Tiles a function acording to
-pub fn tile<A, D1, D2>(arr: &Array<A, D1>, reps: Vec<usize>) -> Array<A, D2>
+///WARNING: this implementation currently doesn't match the behavior of numpy due
+/// to issues with the dimensions
+pub(crate) fn tile<A, D>(arr: &Array<A, D>, reps: Vec<usize>) -> Array<A, IxDyn>
 where
     A: Clone,
-
-    D1: Dimension,
-    D2: Dimension,
+    D: Dimension,
 {
     let num_of_reps = reps.len();
 
     //just clone the array if reps is all ones
-    let mut res = arr.clone();
+
     let bail_flag = true;
+
     for &x in reps.iter() {
         if x != 1 {
             bail_flag = false;
         }
     }
+
     if bail_flag {
+        let mut res_dim = arr.shape().to_owned();
+
+        _new_shape(num_of_reps, arr.ndim(), &mut res_dim);
+        let res = arr
+            .to_owned()
+            .into_shape(Dim(res_dim))
+            .expect("something went wrong with the tile function during base case");
+
         return res;
     }
     //TODO: this may need to be changed, numpy is avoiding allocations unless
@@ -53,30 +67,23 @@ where
 
     //so this seems to pad the number of reps so that the later zip doesn't lose
     //data, but still not getting how this
-    if num_of_reps < res.ndim() {
-        // in case of fire: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1250
-        ////tup = (1,)*(res.ndim()-num_of_reps) + tup
-        //a tuple multiplied by `n` is that same tuple repeated `n` times
-        //c is a "copy" of the input array
-        //+ concatenates tuples in python
-        let mut tmp = vec![1; res.ndim() - num_of_reps];
-        tmp.push(reps);
-        reps = tmp;
-    }
+    _new_shape(num_of_reps, arr.ndim(), &mut reps);
     //NOTE: need to revisit this section, also if we can determine the type of shape out
     //we may be able to reduce the two zips to one.
     //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
-    let shape_out = Zip::from(res.shape())
-        .and(&reps)
-        .for_each(|s, t| s * t)
-        .collect();
-    let n = res.size();
+    let mut shape_out = arr.shape().to_owned();
+    let mut input_shape = shape_out.clone();
+    azip!((a in &mut shape_out, &b in &reps) *a= *a*b);
+    let n = arr.len();
+    let mut res: ArrayBase<OwnedRepr<A>, IxDyn> = arr
+        .to_owned()
+        .into_shape(IxDyn(arr.shape()))
+        .expect("something went wrong with the tile function instantiating result array");
     if n > 0 {
         //what's going on if reps is larger than shape
-        Zip::from(res.shape())
+        Zip::from(&mut arr.shape().to_owned())
             .and(&reps)
-            .into_iter()
-            .for_each(|(dim_in, nrep)| {
+            .for_each(|dim_in, &nrep| {
                 if nrep != 1 {
                     //note on the negative value in reshape
                     //https://stackoverflow.com/questions/46281579/numpy-reshape-with-negative-values
@@ -85,14 +92,49 @@ where
                     //docs for ndarrays reshape and into_shape
                     //https://docs.rs/ndarray/latest/ndarray/struct.Shape.html?search=reshape
                     //https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.into_shape
-                    res = res.reshape([-1, n]).repeat(nrep, 0)
+                    res = res
+                        .into_shape([res.raw_dim()[0] - 1, n])
+                        .expect(&format!(
+                            "error reshaping result into shape {:?} , {:?}",
+                            res.raw_dim()[0] - 1,
+                            n,
+                        ))
+                        .repeat(nrep, 0) //FFFFUUUUUUCKKK!
+                                         //TODO: figure out how to repeat elements
                 }
-                n //= dim_in
+                n = n / *dim_in;
             });
     }
-    return res.reshape(shape_out);
+    res.into_shape(IxDyn(&shape_out));
+    return res;
 }
 
+fn _new_shape(num_of_reps: usize, array_dims: usize, reps: &mut Vec<usize>) {
+    if num_of_reps < array_dims {
+        // in case of fire: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1250
+        ////tup = (1,)*(res.ndim()-num_of_reps) + tup
+        //a tuple multiplied by `n` is that same tuple repeated `n` times
+        //c is a "copy" of the input array
+        //+ concatenates tuples in python
+        let mut tmp: Vec<usize> = vec![1; array_dims - num_of_reps];
+        tmp.append(reps);
+        *reps = tmp;
+    }
+}
+fn _new_dims(num_of_reps: usize, array_dims: usize, reps: Vec<usize>) -> Dim<IxDynImpl> {
+    if num_of_reps < array_dims {
+        // in case of fire: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1250
+        ////tup = (1,)*(res.ndim()-num_of_reps) + tup
+        //a tuple multiplied by `n` is that same tuple repeated `n` times
+        //c is a "copy" of the input array
+        //+ concatenates tuples in python
+        let mut tmp: Vec<usize> = vec![1; array_dims - num_of_reps];
+        tmp.append(&mut reps);
+        Dim(tmp)
+    } else {
+        Dim(reps)
+    }
+}
 /// Pad the edges of an array with zeros.
 ///
 /// `pad_width` specifies the length of the padding at the beginning
@@ -410,5 +452,13 @@ impl<A: num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<
     fn log(self) -> Array<A, I> {
         self.map_inplace(|n| *n = (*n).ln());
         self
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn tile_test() {
+        todo!()
     }
 }
