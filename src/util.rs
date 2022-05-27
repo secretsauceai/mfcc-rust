@@ -74,7 +74,11 @@ where
     let mut shape_out = arr.shape().to_owned();
     let mut input_shape = shape_out.clone();
     azip!((a in &mut shape_out, &b in &reps) *a= *a*b);
-    let n = arr.len();
+    //in numpy len(n) returns the length of the outermost axis so shape (1,3,4) -> 1
+    let mut n = arr.len_of(Axis(0));
+    //the length of the last axis of the results shape at a given step
+    let mut last_axis_len: usize = 0;
+    //the a copy of the input which will be reshaped
     let mut res: ArrayBase<OwnedRepr<A>, IxDyn> = arr
         .to_owned()
         .into_shape(IxDyn(arr.shape()))
@@ -85,22 +89,16 @@ where
             .and(&reps)
             .for_each(|dim_in, &nrep| {
                 if nrep != 1 {
-                    //note on the negative value in reshape
-                    //https://stackoverflow.com/questions/46281579/numpy-reshape-with-negative-values
-                    //docs for numpy's ndarray reshape:
-                    //https://numpy.org/doc/stable/reference/generated/numpy.ndarray.reshape.html
-                    //docs for ndarrays reshape and into_shape
-                    //https://docs.rs/ndarray/latest/ndarray/struct.Shape.html?search=reshape
-                    //https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.into_shape
+                    //shape (2,4) should return 4
+                    last_axis_len = res.shape()[res.shape().len() - 1];
                     res = res
-                        .into_shape([res.raw_dim()[0] - 1, n])
+                        .into_shape([last_axis_len, n])
                         .expect(&format!(
                             "error reshaping result into shape {:?} , {:?}",
-                            res.raw_dim()[0] - 1,
-                            n,
+                            last_axis_len, n,
                         ))
-                        .repeat(nrep, 0) //FFFFUUUUUUCKKK!
-                                         //TODO: figure out how to repeat elements
+                        .repeat(nrep, 0); //FFFFUUUUUUCKKK!
+                                          //TODO: figure out how to repeat elements
                 }
                 n = n / *dim_in;
             });
