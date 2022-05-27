@@ -1,4 +1,4 @@
-use std::fmt::format;
+use std::{fmt::format, iter::zip};
 
 use ndarray::{
     azip, Array, Array1, Array2, ArrayBase, ArrayD, ArrayView, ArrayViewMut, Axis, Dim, DimMax,
@@ -32,16 +32,16 @@ enum EdgeColOp {
 }
 ///WARNING: this implementation currently doesn't match the behavior of numpy due
 /// to issues with the dimensions
-pub(crate) fn tile<A, D>(arr: &Array<A, D>, reps: Vec<usize>) -> Array<A, IxDyn>
+pub(crate) fn tile<A, D>(arr: &Array<A, D>, mut reps: Vec<usize>) -> Array<A, IxDyn>
 where
-    A: Clone,
+    A: Clone + std::fmt::Display,
     D: Dimension,
 {
     let num_of_reps = reps.len();
 
     //just clone the array if reps is all ones
 
-    let bail_flag = true;
+    let mut bail_flag = true;
 
     for &x in reps.iter() {
         if x != 1 {
@@ -72,7 +72,7 @@ where
     //we may be able to reduce the two zips to one.
     //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
     let mut shape_out = arr.shape().to_owned();
-    let mut input_shape = shape_out.clone();
+
     azip!((a in &mut shape_out, &b in &reps) *a= *a*b);
     //in numpy len(n) returns the length of the outermost axis so shape (1,3,4) -> 1
     let mut n = arr.len_of(Axis(0));
@@ -82,26 +82,27 @@ where
     let mut res: ArrayBase<OwnedRepr<A>, IxDyn> = arr.to_owned().into_dyn();
     if n > 0 {
         //what's going on if reps is larger than shape
-        Zip::from(&mut arr.shape().to_owned())
-            .and(&reps)
-            .for_each(|dim_in, &nrep| {
-                if nrep != 1 {
-                    //shape (2,4) should return 4
-                    last_axis_len = res.shape()[res.shape().len() - 1];
-                    res = res
-                        .into_shape([last_axis_len, n])
-                        .expect(&format!(
-                            "error reshaping result into shape {:?} , {:?}",
-                            last_axis_len, n,
-                        ))
-                        .repeat(nrep, 0); //FFFFUUUUUUCKKK!
-                                          //TODO: figure out how to repeat elements
-                }
-                n = n / *dim_in;
-            });
+        for (dim_in, &nrep) in zip(&mut arr.shape().to_owned(), &reps) {
+            if nrep != 1 {
+                //shape (2,4) should return 4
+                last_axis_len = res.shape()[res.shape().len() - 1];
+                res = res
+                    .into_shape([last_axis_len, n])
+                    .expect(&format!(
+                        "error reshaping result into shape {:?} , {:?}",
+                        last_axis_len, n,
+                    ))
+                    .into_dyn(); //how much will this cost?
+                                 //TODO: figure out how to repeat elements
+                                 //res.repeat(nrep, 0); //FFFFUUUUUUCKKK!
+            }
+            n = n / *dim_in;
+        }
     }
     res.into_shape(IxDyn(&shape_out));
-    return res;
+    return res
+        .into_shape(IxDyn(&shape_out))
+        .expect(&format!("trouble reshaping output {}", res));
 }
 
 fn _new_shape(num_of_reps: usize, array_dims: usize, reps: &mut Vec<usize>) {
@@ -116,20 +117,7 @@ fn _new_shape(num_of_reps: usize, array_dims: usize, reps: &mut Vec<usize>) {
         *reps = tmp;
     }
 }
-fn _new_dims(num_of_reps: usize, array_dims: usize, reps: Vec<usize>) -> Dim<IxDynImpl> {
-    if num_of_reps < array_dims {
-        // in case of fire: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1250
-        ////tup = (1,)*(res.ndim()-num_of_reps) + tup
-        //a tuple multiplied by `n` is that same tuple repeated `n` times
-        //c is a "copy" of the input array
-        //+ concatenates tuples in python
-        let mut tmp: Vec<usize> = vec![1; array_dims - num_of_reps];
-        tmp.append(&mut reps);
-        Dim(tmp)
-    } else {
-        Dim(reps)
-    }
-}
+
 /// Pad the edges of an array with zeros.
 ///
 /// `pad_width` specifies the length of the padding at the beginning

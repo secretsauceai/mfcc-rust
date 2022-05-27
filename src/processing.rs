@@ -81,13 +81,14 @@ pub fn stack_frames(
     zero_padding: bool, /*=True*/
 ) -> Array2<f64> {
     // Check dimension
-    assert!(
-        sig.ndim() == 1,
-        &format!(
-            "Signal dimention should be of the format of (N,) but it is {:?} instead",
-            sig.shape()
-        )
-    );
+    //not necessary due to function type signature
+    // assert!(
+    //     sig.ndim() == 1,
+    //     &format!(
+    //         "Signal dimention should be of the format of (N,) but it is {:?} instead",
+    //         sig.shape()
+    //     )
+    // );
 
     // Initial necessary values
     let length_signal = sig.len();
