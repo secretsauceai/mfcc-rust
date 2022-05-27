@@ -124,10 +124,10 @@ pub fn stack_frames(
     };
 
     // Getting the indices of all frames.
-    let indices = tile::<f64, Ix1, Ix2>(
+    let indices = tile::<f64, Ix1>(
         &ndarray::Array::range(0., frame_sample_length as f64, 1.),
         vec![numframes, 1],
-    ) + tile::<f64, Ix1, Ix2>(
+    ) + tile::<f64, Ix1>(
         &ndarray::Array::range(0., numframes as f64 * frame_stride, frame_stride),
         vec![frame_sample_length, 1],
     )
@@ -135,14 +135,20 @@ pub fn stack_frames(
     let indices = indices.mapv(|v| v as usize);
 
     // Extracting the frames based on the allocated indices.
-    let frames = indices.map(|i| {
-        *signal.get(*i).expect(&format!(
-            "code paniced when trying to access element {} of ndarray signal.\n\n signal:\n{}",
-            i, signal
-        ))
-    });
+    let frames = indices
+        .map(|i| {
+            *signal.get(*i).expect(&format!(
+                "code paniced when trying to access element {} of ndarray signal.\n\n signal:\n{}",
+                i, signal
+            ))
+        })
+        .into_dimensionality::<Ix2>()
+        .expect("failed to convert frames into 2D array");
 
-    let window = tile::<f64, Ix1, Ix2>(&filter(frame_sample_length), vec![numframes, 1]);
+    let window = tile::<f64, Ix1>(&filter(frame_sample_length), vec![numframes, 1])
+        .into_dimensionality::<Ix2>()
+        .expect("failed to convert window into 2d array");
+
     //NOTE: frames is Nx1, window is Mx1, so result is MxN
     frames * window // Extracted frames
 }
@@ -298,7 +304,7 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
 
     // Mean calculation
     let norm = &vec.mean_axis(Axis(0)).unwrap();
-    let norm_vec = tile::<f64, Ix1, Ix2>(norm, vec![*rows, 1]);
+    let norm_vec = tile::<f64, Ix1>(norm, vec![*rows, 1]);
 
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
@@ -307,11 +313,15 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
 
-        let stdev_vec = tile::<f64, Ix1, Ix2>(&stdev, vec![*rows, 1]);
+        let stdev_vec = tile::<f64, ndarray::IxDyn>(&stdev, vec![*rows, 1]);
 
-        mean_subtracted / (stdev_vec + eps)
+        (mean_subtracted / (stdev_vec + eps))
+            .into_dimensionality::<Ix2>()
+            .expect("error shaping output of cmvn with variance normalization")
     } else {
         mean_subtracted
+            .into_dimensionality::<Ix2>()
+            .expect("error shaping output of cmvn with variance normalization")
     }
 }
 

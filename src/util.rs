@@ -79,10 +79,7 @@ where
     //the length of the last axis of the results shape at a given step
     let mut last_axis_len: usize = 0;
     //the a copy of the input which will be reshaped
-    let mut res: ArrayBase<OwnedRepr<A>, IxDyn> = arr
-        .to_owned()
-        .into_shape(IxDyn(arr.shape()))
-        .expect("something went wrong with the tile function instantiating result array");
+    let mut res: ArrayBase<OwnedRepr<A>, IxDyn> = arr.to_owned().into_dyn();
     if n > 0 {
         //what's going on if reps is larger than shape
         Zip::from(&mut arr.shape().to_owned())
