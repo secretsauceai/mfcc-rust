@@ -124,7 +124,7 @@ pub fn filterbanks(
 //convert to dynamic dimensions (IxDyn) if input varies between
 //1 and 2d output
 // see https://docs.rs/ndarray/latest/ndarray/type.IxDyn.html
-fn mfcc(
+pub fn mfcc(
     signal: Array1<f64>,
     sampling_frequency: usize,
     frame_length: f64,           // =0.020,
@@ -165,14 +165,20 @@ where
     //3. axis=-1: apply along last axis of feature
     //4. norm="ortho": when used with dct type 2, applies a scaling factor
 
-    //#TODO: fix this
     //need to switch to rustfft, provide len of last axis specifically
     let mut dct_handler: DctHandler<f64> = DctHandler::new(feature_axis_len);
     //need to check how to specify axis of transformation
     nddct2(&feature, &mut transformed_feature, &mut dct_handler, 1);
-    //TODO: features still needs to be normalized
+    //NOTE: may be able to remove the if/else by processing first element separately
     //https://docs.scipy.org/doc/scipy/reference/generated/scipy.fftpack.dct.html#:~:text=2N)-,If%20norm%3D%27ortho%27%2C%20y%5Bk%5D%20is%20multiplied%20by%20a%20scaling%20factor%20f,-f%3D%7B
-    //transformed_feature.normalize!
+    let n = transformed_feature.len() as f64;
+    transformed_feature.map_mut(|x| {
+        *x = if *x == 0. {
+            *x * (1. / (4. * n).sqrt())
+        } else {
+            *x * (1. / (2. * n).sqrt())
+        }
+    });
     feature.slice(s![.., ..num_cepstral]);
 
     // replace first cepstral coefficient with log of frame energy for DC
@@ -189,6 +195,7 @@ where
     }
     return feature;
 }
+
 fn f_it(x: usize) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
     Array1::<f64>::ones(x as usize)
 }
@@ -214,6 +221,7 @@ fn f_it(x: usize) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
    Returns:
              array: features - the energy of fiterbank of size num_frames x num_filters. The energy of each frame: num_frames x 1
    */
+
 fn mfe(
     signal: Array1<f64>,
     sampling_frequency: usize,
@@ -286,7 +294,7 @@ fn mfe(
         high_frequency (float): highest band edge of mel filters.
             In Hz, default is samplerate/2
    Returns:
-             array: Features - The log energy of fiterbank of size num_frames x num_filters frame_log_energies. The log energy of each frame num_frames x 1
+        array: Features - The log energy of fiterbank of size num_frames x num_filters frame_log_energies. The log energy of each frame num_frames x 1
 */
 fn lmfe(
     signal: Array1<f64>,
