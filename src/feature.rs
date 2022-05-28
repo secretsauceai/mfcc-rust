@@ -78,7 +78,7 @@ pub fn filterbanks(
         .map(|x| ((coefficients as i32 + 1) as f64 * x / sampling_freq) as usize);
 
     // Initial definition
-    let filterbank = Array2::zeros([num_filter, coefficients]);
+    let mut filterbank = Array2::zeros([num_filter, coefficients]);
 
     // The triangular function for each filter
     for i in 0..num_filter {
@@ -90,7 +90,7 @@ pub fn filterbanks(
         {
             let mut s: ArrayViewMut1<f64> =
                 filterbank.slice_mut(s![i, left as usize..right as usize + 1]);
-            triangle(s, z, left, middle, right);
+            triangle(&mut s, z, left, middle, right);
         }
     }
 
@@ -138,7 +138,7 @@ fn mfcc(
 ) -> Array2<f64>
 where
 {
-    let (feature, energy) = mfe(
+    let (mut feature, energy) = mfe(
         signal,
         sampling_frequency,
         frame_length,
@@ -320,9 +320,9 @@ fn lmfe(
           array: The feature cube vector which contains the static, first and second derivative features of size: N x M x 3
 */
 fn extract_derivative_feature(feature: Array2<f64>) -> Array3<f64> {
-    let first_derivative_feature = crate::processing::derivative_extraction(feature, 2);
+    let first_derivative_feature = crate::processing::derivative_extraction(&feature, 2);
     let second_derivative_feature =
-        crate::processing::derivative_extraction(first_derivative_feature, 2);
+        crate::processing::derivative_extraction(&first_derivative_feature, 2);
 
     // Creating the future cube for each file
     //Note about numpy syntax in equivalent function

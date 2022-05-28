@@ -36,7 +36,7 @@ pub fn mel_to_frequency(mel: Array1<f64>) -> Array1<f64> {
     mel.map(|v| 700. * ((v / 1127.0).exp() - 1.))
 }
 
-pub fn triangle(arr: ArrayViewMut1<f64>, x: Array1<f64>, left: f64, middle: f64, right: f64) {
+pub fn triangle(arr: &mut ArrayViewMut1<f64>, x: Array1<f64>, left: f64, middle: f64, right: f64) {
     //original function: https://github.com/astorfi/speechpy/blob/master/speechpy/functions.py#L44
 
     //arr[x <= left] = 0;
@@ -44,10 +44,10 @@ pub fn triangle(arr: ArrayViewMut1<f64>, x: Array1<f64>, left: f64, middle: f64,
     arr.indexed_iter_mut().for_each(|(i, v)| {
         if (left..right).contains(v) {
             //TODO: fix range bounds to be exclusive, see https://github.com/rust-lang/rust/issues/37854
-            if v <= &mut middle {
+            if *v <= middle {
                 *v = (x[i] - left) / (middle - left);
             } //NOTE: depending on whether the double <= >= is intended or not, may be simplified to just else
-            if &mut middle <= v {
+            if middle <= *v {
                 *v = (right - x[i]) / (right - middle);
             }
         } else {

@@ -99,10 +99,10 @@ where
             n = n / *dim_in;
         }
     }
-    res.into_shape(IxDyn(&shape_out));
+    //res.into_shape(IxDyn(&shape_out));
     return res
         .into_shape(IxDyn(&shape_out))
-        .expect(&format!("trouble reshaping output {}", res));
+        .expect("trouble reshaping output");
 }
 
 fn _new_shape(num_of_reps: usize, array_dims: usize, reps: &mut Vec<usize>) {
@@ -151,7 +151,7 @@ where
         padded_shape[ax] = ax_len + pre_ax + post_ax;
     }
 
-    let mut padded = Array::from_elem(padded_shape, const_value);
+    let mut padded = Array::from_elem(padded_shape.clone(), const_value);
     let padded_dim = padded.raw_dim();
     {
         // Select portion of padded array that needs to be copied from the
@@ -194,12 +194,12 @@ fn symmetric_pad<A, D>(
 {
     let mut a_inv = input_array.clone();
 
-    let mut sub_len = 0_usize;
+    let mut sub_len: usize;
     //let mut center_flag = false;
-    let mut left_b: isize = 0;
-    let mut right_b: isize = 0;
-    let mut range_start: isize = 0;
-    let mut range_stop: isize = 0;
+    let mut left_b: isize;
+    let mut right_b: isize;
+    let mut range_start: isize;
+    let mut range_stop: isize;
 
     //right now this only handles the cross sections
     //since the input is always 0 padded along one axis this
@@ -242,7 +242,7 @@ fn symmetric_pad<A, D>(
                 &mut portion,
                 &mut original_slice,
                 sub_len as isize,
-                padded_shape,
+                padded_shape.clone(),
                 &pad_width,
                 ax as isize,
                 Some(EdgeRowOp::Top),
@@ -289,7 +289,7 @@ fn symmetric_pad<A, D>(
                 &mut portion,
                 &mut original_slice,
                 sub_len as isize,
-                padded_shape,
+                padded_shape.clone(),
                 &pad_width,
                 ax as isize,
                 Some(EdgeRowOp::Bottom),
@@ -311,8 +311,8 @@ fn edge_pad<A, D>(
     D: Dimension,
 {
     let mut sub_len = 0_usize;
-    let mut range_start: isize = 0;
-    let mut range_stop: isize = 0;
+    let mut range_start: isize;
+    let mut range_stop: isize;
     for (ax, (&ax_len, &[pre_ax, post_ax])) in
         input_array.shape().iter().zip(&pad_width).enumerate()
     {
@@ -333,7 +333,7 @@ fn edge_pad<A, D>(
             1
         };
         let mut portion = padded_array.view_mut();
-        let mut input_slice = input_array.view_mut();
+        let mut input_slice = input_array.view();
         for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
             if ax == axis {
                 portion.slice_axis_inplace(
@@ -341,24 +341,24 @@ fn edge_pad<A, D>(
                     Slice::from(lo as isize..(padded_shape[axis] - hi) as isize),
                 );
 
-                input_slice.slice_axis_inplace(Axis(axis), Slice::from(0..));
+                input_slice.slice_axis_inplace(Axis(axis), Slice::from(0_isize..));
             } else {
                 portion.slice_axis_inplace(Axis(axis), Slice::from(0..lo));
-                input_slice.slice_axis_inplace(Axis(axis), Slice::from(0..1));
+                input_slice.slice_axis_inplace(Axis(axis), Slice::from(0_isize..1));
             }
         }
         portion.assign(&input_slice);
-        portion = padded_array.view_mut();
+        let mut portion = padded_array.view_mut();
         for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
-            padded_array.slice_axis_inplace(
+            portion.slice_axis_inplace(
                 Axis(axis),
                 Slice::from(lo as isize..(padded_shape[axis] - hi) as isize),
             );
         }
         portion.assign(&input_array);
 
-        portion = padded_array.view_mut();
-        input_slice = input_array.view_mut();
+        let mut portion = padded_array.view_mut();
+        input_slice = input_array.view();
         //start on the last half
         for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
             if ax == axis {
@@ -367,10 +367,10 @@ fn edge_pad<A, D>(
                     Slice::from(lo as isize..(padded_shape[axis] - hi) as isize),
                 );
 
-                input_slice.slice_axis_inplace(Axis(axis), Slice::from(0..));
+                input_slice.slice_axis_inplace(Axis(axis), Slice::from(0_isize..));
             } else {
                 portion.slice_axis_inplace(Axis(axis), Slice::from(hi..padded_shape[axis]));
-                input_slice.slice_axis_inplace(Axis(axis), Slice::from(-1..));
+                input_slice.slice_axis_inplace(Axis(axis), Slice::from(-1_isize..));
             }
         }
         portion.assign(&input_slice);
@@ -378,7 +378,7 @@ fn edge_pad<A, D>(
 }
 fn set_edge<A, D>(
     padded_array: &mut ArrayViewMut<A, D>,
-    input_array: &mut ArrayView<A, D>, //todo: fix this, view should be mutable not the underlying input
+    input_array: &ArrayView<A, D>, //todo: fix this, view should be mutable not the underlying input
     sub_len: isize,
     padded_shape: D,
     pad_width: &Vec<[usize; 2]>,
@@ -389,15 +389,16 @@ fn set_edge<A, D>(
     A: Clone,
     D: Dimension,
 {
+    let mut input_slice = input_array.view();
     for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
         if current_axis == axis as isize {
             match row_op {
                 Some(EdgeRowOp::Top) => {
-                    input_array.slice_axis_inplace(Axis(axis), Slice::from(0..sub_len + 1_isize));
+                    input_slice.slice_axis_inplace(Axis(axis), Slice::from(0..sub_len + 1_isize));
                     padded_array.slice_axis_inplace(Axis(axis), Slice::from(0..sub_len + 1));
                 }
                 Some(EdgeRowOp::Bottom) => {
-                    input_array
+                    input_slice
                         .slice_axis_inplace(Axis(axis), Slice::from(0 as isize..sub_len + 1_isize));
                     padded_array.slice_axis_inplace(
                         Axis(axis),
@@ -408,7 +409,7 @@ fn set_edge<A, D>(
                     );
                 }
                 None => {
-                    input_array.slice_axis_inplace(Axis(axis), Slice::from(0_isize..));
+                    input_slice.slice_axis_inplace(Axis(axis), Slice::from(0_isize..));
                     padded_array.slice_axis_inplace(
                         Axis(axis),
                         Slice::from(lo as isize..(padded_shape[axis] - hi) as isize),
@@ -416,7 +417,7 @@ fn set_edge<A, D>(
                 }
             }
         } else {
-            input_array.slice_axis_inplace(Axis(axis), Slice::from(0_isize..));
+            input_slice.slice_axis_inplace(Axis(axis), Slice::from(0_isize..));
             padded_array.slice_axis_inplace(
                 Axis(axis),
                 Slice::from(lo as isize..(padded_shape[axis] - hi) as isize),
@@ -432,7 +433,7 @@ pub trait ArrayLog<A: num_traits::real::Real, I: ndarray::Dimension> {
 }
 
 impl<A: num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<A, I> {
-    fn log(self) -> Array<A, I> {
+    fn log(mut self) -> Array<A, I> {
         self.map_inplace(|n| *n = (*n).ln());
         self
     }

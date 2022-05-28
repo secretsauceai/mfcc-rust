@@ -250,7 +250,7 @@ This function the derivative features.
            array: Derivative feature vector - A NUMFRAMESxNUMFEATURES numpy
            array which is the derivative features along the features.
 */
-pub fn derivative_extraction(feat: Array2<f64>, DeltaWindows: usize) -> Array2<f64> {
+pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<f64> {
     // Getting the shape of the vector.
     let [rows, cols] = feat.shape();
 
@@ -349,7 +349,7 @@ fn cmvnw(
     //TODO: verify shape of output
     // Get the shapes
     let eps = 2f64.powf(-30.);
-    let [rows, cols] = vec.shape();
+    let &[rows, cols] = vec.shape();
 
     // Windows size must be odd.
     //assert isinstance(win_size, int), "Size must be of type 'int'!"
@@ -366,7 +366,7 @@ fn cmvnw(
     );
     let mut mean_subtracted = ndarray::Array2::<f64>::zeros(vec.raw_dim());
 
-    (0..*rows).for_each(|i| {
+    (0..rows).for_each(|i| {
         let window = vec_pad.slice(s![i..i + win_size, ..]); //NOTE: we have to fix pad before fixing this error
                                                              //TODO: preallocate window mean
         let window_mean = window.mean_axis(Axis(0)).unwrap();
@@ -376,7 +376,7 @@ fn cmvnw(
     // Variance normalization
     if variance_normalization {
         // Initial definitions.
-        let variance_normalized = Array2::<f64>::zeros(vec.raw_dim());
+        let mut variance_normalized = Array2::<f64>::zeros(vec.raw_dim());
         let vec_pad_variance = pad(
             &mean_subtracted,
             vec![[pad_size, pad_size], [0, 0]],
@@ -385,7 +385,7 @@ fn cmvnw(
         );
 
         // Looping over all observations.
-        (0..*rows).for_each(|i| {
+        (0..rows).for_each(|i| {
             let window = vec_pad_variance.slice(s![i..i + win_size, ..]); //currently the return type is wrapped around &&str?
             let window_variance = window.std_axis(Axis(0), 0.);
             azip!((a in &mut variance_normalized.slice_mut(s![i, ..]),
