@@ -13,13 +13,8 @@ Attributes:
     cmvnw: Cepstral mean variance normalization over the sliding window. This is a post processing operation.
 */
 
-const __license__: &str = "MIT";
-const __author__: &str = " Amirsina Torfi";
-const __docformat__: &str = "reStructuredText";
-
-/*import decimal
-import numpy as np
-import math*/
+const __LICENSE__: &str = "MIT";
+//const __docformat__: &str = "reStructuredText";
 
 use std::ops::Mul;
 
@@ -223,7 +218,7 @@ fn log_power_spectrum(
     normalize: bool,   /*=True*/
 ) -> Array2<f64> {
     let mut mx = 1e-20 as f64; //had to do this because of trait constraints on max
-    let log_power_spec = power_spectrum(frames, fft_points).map(|x| {
+    let log_power_spec = power_spectrum(frames, fft_points).map_mut(|x| {
         if *x > 1e-20 {
             *x = 10. * x.log10();
             mx = *x;
@@ -252,11 +247,11 @@ This function the derivative features.
 */
 pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<f64> {
     // Getting the shape of the vector.
-    let [rows, cols] = feat.shape();
+    let cols = feat.shape()[1];
 
     // Difining the vector of differences.
     let mut DIF = Array2::<f64>::zeros(feat.raw_dim());
-    let Scale = 0.;
+    let mut Scale = 0.;
 
     // Pad only along features in the vector.
     let FEAT = pad(
@@ -301,11 +296,11 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
 */
 fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
     let eps = 2.0f64.powf(-30.);
-    let [rows, cols] = vec.shape();
+    let rows = vec.shape()[0];
 
     // Mean calculation
     let norm = &vec.mean_axis(Axis(0)).unwrap();
-    let norm_vec = tile::<f64, Ix1>(norm, vec![*rows, 1]);
+    let norm_vec = tile::<f64, Ix1>(norm, vec![rows, 1]);
 
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
@@ -314,7 +309,7 @@ fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
 
-        let stdev_vec = tile::<f64, ndarray::IxDyn>(&stdev, vec![*rows, 1]);
+        let stdev_vec = tile::<f64, ndarray::IxDyn>(&stdev, vec![rows, 1]);
 
         (mean_subtracted / (stdev_vec + eps))
             .into_dimensionality::<Ix2>()
@@ -349,7 +344,7 @@ fn cmvnw(
     //TODO: verify shape of output
     // Get the shapes
     let eps = 2f64.powf(-30.);
-    let &[rows, cols] = vec.shape();
+    let rows = vec.shape()[0];
 
     // Windows size must be odd.
     //assert isinstance(win_size, int), "Size must be of type 'int'!"
