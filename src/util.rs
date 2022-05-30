@@ -22,11 +22,11 @@ pub enum PadType {
     Symmetric,
     Edge, //may add more
 }
-enum EdgeRowOp {
+pub enum EdgeRowOp {
     Top,
     Bottom,
 }
-enum EdgeColOp {
+pub enum EdgeColOp {
     Left,
     Right,
 }
@@ -34,7 +34,7 @@ enum EdgeColOp {
 /// to issues with the dimensions
 pub(crate) fn tile<A, D>(arr: &Array<A, D>, mut reps: Vec<usize>) -> Array<A, IxDyn>
 where
-    A: Clone + std::fmt::Display,
+    A: Clone + std::fmt::Display + num_traits::Zero,
     D: Dimension,
 {
     let num_of_reps = reps.len();
@@ -77,7 +77,8 @@ where
     //in numpy len(n) returns the length of the outermost axis so shape (1,3,4) -> 1
     let mut n = arr.len_of(Axis(0));
     //the length of the last axis of the results shape at a given step
-    let mut last_axis_len: usize = 0;
+
+    let mut last_axis_len: usize;
     //the a copy of the input which will be reshaped
     let mut res: ArrayBase<OwnedRepr<A>, IxDyn> = arr.to_owned().into_dyn();
     if n > 0 {
@@ -95,6 +96,9 @@ where
                     .into_dyn(); //how much will this cost?
                                  //TODO: figure out how to repeat elements
                                  //res.repeat(nrep, 0); //FFFFUUUUUUCKKK!
+                if nrep != 1 {
+                    res = repeat(&res, nrep).into_dyn();
+                }
             }
             n = n / *dim_in;
         }
@@ -103,6 +107,24 @@ where
     return res
         .into_shape(IxDyn(&shape_out))
         .expect("trouble reshaping output");
+}
+
+fn repeat<A, D>(arr: &ArrayBase<OwnedRepr<A>, D>, nrep: usize) -> Array2<A>
+where
+    A: Clone + std::fmt::Display + num_traits::Zero,
+    D: Dimension,
+{
+    let repeat_axis_len = arr.shape()[0] * nrep;
+    let mut res = ndarray::Array2::<A>::zeros((repeat_axis_len, arr.shape()[1]));
+    for (i, ax) in arr.lanes(Axis(0)).into_iter().enumerate() {
+        let lo = i * nrep;
+        let hi = (lo) + (nrep - 1);
+        for j in lo..hi {
+            let mut current_axis = res.index_axis_mut(Axis(0), j);
+            current_axis.assign(&ax);
+        }
+    }
+    res
 }
 
 fn _new_shape(num_of_reps: usize, array_dims: usize, reps: &mut Vec<usize>) {

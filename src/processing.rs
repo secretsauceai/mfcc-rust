@@ -89,8 +89,8 @@ pub fn stack_frames(
     let length_signal = sig.len();
     let frame_sample_length = (sampling_frequency as f64 * frame_length).round() as usize; // Defined by the number of samples
     let frame_stride = (sampling_frequency as f64 * frame_stride).round();
-    let mut len_sig: usize = 0;
-    let mut numframes: usize = 0;
+    let mut len_sig: usize;
+    let mut numframes: usize;
 
     //TODO: once the code is working simplify this section, handle sig directly and
     //let the below if else declare the last index
@@ -134,7 +134,7 @@ pub fn stack_frames(
     let frames = indices
         .map(|i| {
             *signal.get(*i).expect(&format!(
-                "code paniced when trying to access element {} of ndarray signal.\n\n signal:\n{}",
+                "code panicked when trying to access element {} of ndarray signal.\n\n signal:\n{}",
                 i, signal
             ))
         })
