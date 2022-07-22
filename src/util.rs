@@ -67,44 +67,54 @@ where
     //see the line: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1246
     // and SO post: https://stackoverflow.com/a/27609904/11019565
 
-    //so this seems to pad the number of reps so that the later zip doesn't lose
-    //data, but still not getting how this
-    _new_shape(num_of_reps, arr.ndim(), &mut reps);
+    //to avoid repeatedly casting to IxDyn, and since the input is a 1D array, and the loop takes a 2d array for all ops
+    //the result is going to be stored as a 2d array until it's reshaped at the very last step
+    let mut res: Array2<A> = arr.to_owned().into_shape((1,arr.len())).unwrap();
+    let mut shape_out = res.shape().to_owned();
+    
+    
+    if num_of_reps > res.ndim(){
+        _new_shape(res.ndim(), num_of_reps, &mut shape_out);
+        //res=res.into_shape(shape_out.clone()).unwrap();
+    }
+    
     //NOTE: need to revisit this section, also if we can determine the type of shape out
     //we may be able to reduce the two zips to one.
     //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
-    let mut shape_out = arr.shape().to_owned();
-
-    azip!((a in &mut shape_out, &b in &reps) *a= *a*b);
-    //in numpy len(n) returns the length of the outermost axis so shape (1,3,4) -> 1
-    let mut n = arr.len_of(Axis(0));
-    //the length of the last axis of the results shape at a given step
-
-    let mut last_axis_len: usize;
+    _new_shape(num_of_reps,arr.ndim(),&mut reps);
+    println!("shape_out {:?}/n, reps: {:?}", shape_out, reps);
+    azip!((a in &mut shape_out, &b in &reps) *a= *a * b);
+    
+    
+    let mut n = res.len();
+    
+    //used because negative indexing doesn't work
+    let mut first_dim: usize;
+    
     //the a copy of the input which will be reshaped
-    let mut res: ArrayBase<OwnedRepr<A>, IxDyn> = arr.to_owned().into_dyn();
+    
     if n > 0 {
         //what's going on if reps is larger than shape
-        for (dim_in, &nrep) in zip(&mut arr.shape().to_owned(), &reps) {
+        for (dim_in, &nrep) in zip(&mut res.shape().to_owned(), &reps) {
             if nrep != 1 {
                 //shape (2,4) should return 4
-                last_axis_len = res.shape()[res.shape().len() - 1];
+                println!("res len: {:?}, n: {:?}, nrep: {:?}",res.len(),n,nrep);
+                first_dim = res.len()-n;
+                first_dim = if first_dim>0 {first_dim} else {1};
                 res = res
-                    .into_shape([last_axis_len, n])
+                    .into_shape([first_dim, n])
                     .expect(&format!(
                         "error reshaping result into shape {:?} , {:?}",
-                        last_axis_len, n,
-                    ))
-                    .into_dyn(); //how much will this cost?
-                                 //TODO: figure out how to repeat elements
-                                 //res.repeat(nrep, 0); //FFFFUUUUUUCKKK!
-                if nrep != 1 {
-                    res = repeat(&res, nrep).into_dyn();
-                }
+                        first_dim, n,
+                    ));
+                println!("starting repeat");
+                res = repeat(&res, nrep);
+                
             }
             n = n / *dim_in;
         }
     }
+    
     //res.into_shape(IxDyn(&shape_out));
     return res
         .into_shape(IxDyn(&shape_out))
@@ -118,9 +128,11 @@ where
 {
     let repeat_axis_len = arr.shape()[0] * nrep;
     let mut res = ndarray::Array2::<A>::zeros((repeat_axis_len, arr.shape()[1]));
+    println!("res shape: {:?}",res.shape());
     for (i, ax) in arr.lanes(Axis(0)).into_iter().enumerate() {
         let lo = i * nrep;
         let hi = (lo) + (nrep - 1);
+        println!("lo {:?}, hi {:?}",lo,hi);
         for j in lo..hi {
             let mut current_axis = res.index_axis_mut(Axis(0), j);
             current_axis.assign(&ax);
@@ -129,14 +141,15 @@ where
     res
 }
 
-fn _new_shape(num_of_reps: usize, array_dims: usize, reps: &mut Vec<usize>) {
-    if num_of_reps < array_dims {
+//prepends 
+fn _new_shape(current_ndims: usize, min_ndims: usize, reps: &mut Vec<usize>) {
+    if current_ndims < min_ndims {
         // in case of fire: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1250
-        ////tup = (1,)*(res.ndim()-num_of_reps) + tup
+        //tup = (1,)*(res.ndim()-num_of_reps) + tup
         //a tuple multiplied by `n` is that same tuple repeated `n` times
         //c is a "copy" of the input array
         //+ concatenates tuples in python
-        let mut tmp: Vec<usize> = vec![1; array_dims - num_of_reps];
+        let mut tmp: Vec<usize> = vec![1; min_ndims - current_ndims];
         tmp.append(reps);
         *reps = tmp;
     }

@@ -265,7 +265,7 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     // Mean calculation
     let norm = &vec.mean_axis(Axis(0)).unwrap();
     let norm_vec = tile::<f64, Ix1>(norm, vec![rows, 1]);
-
+    println!("tile complete");
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
 
