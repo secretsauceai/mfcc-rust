@@ -13,8 +13,6 @@ Attributes:
     cmvnw: Cepstral mean variance normalization over the sliding window. This is a post processing operation.
 */
 
-const __LICENSE__: &str = "MIT";
-//const __docformat__: &str = "reStructuredText";
 
 use std::ops::Mul;
 
@@ -22,22 +20,14 @@ use crate::util::{pad, tile, PadType};
 use ndarray::{azip, s, Array1, Array2, Axis, Dimension, Ix1, Ix2};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 
-// 1.4 becomes 1 and 1.6 becomes 2. special case: 1.5 becomes 2.
-// fn round_half_up(number: i32) -> i32 {
-//     return decimal
-//         .Decimal(number)
-//         .quantize(decimal.Decimal('1'), rounding = decimal.ROUND_HALF_UP) as i32;
-// }
 
-/**
- *  preemphasising on the signal.
-    Args:
-        signal (array): The input signal.
-        shift (int): The shift step.
-        cof (float): The preemphasising coefficient. 0 equals to no filtering.
-    Returns:
-           array: The pre-emphasized signal.
-*/
+/// preemphasising on the signal.
+/// Args:
+///     signal (array): The input signal.
+///     shift (int): The shift step.
+///     cof (float): The preemphasising coefficient. 0 equals to no filtering.
+/// Returns:
+///     The pre-emphasized signal.
 fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Array1<f64> {
     //Note: https://github.com/rust-ndarray/ndarray/issues/281
 
@@ -49,22 +39,18 @@ fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Arr
     }
     signal - (cof * rolled_signal)
 }
-//TODO: change the return type, the returned matrix will have varying dimensions
-/**
- * Frame a signal into overlapping frames.
-    Args:
-        sig (array): The audio signal to frame of size (N,).
-        sampling_frequency (int): The sampling frequency of the signal.
-        frame_length (float): The length of the frame in second.
-        frame_stride (float): The stride between frames.
-        filter (array): The time-domain filter for applying to each frame.
-            By default it is one so nothing will be changed.
-        zero_padding (bool): If the samples is not a multiple of
-            frame_length(number of frames sample), zero padding will
-            be done for generating last frame.
-    Returns:
-            array: Stacked_frames-Array of frames of size (number_of_frames x frame_len).
-*/
+
+//TODO: make filter an optional closure to avoid looping over the input if no filter is provided
+/// Frame a signal into overlapping frames.
+/// Args:
+///     sig (array): The audio signal to frame of size (N,).
+///     sampling_frequency (int): The sampling frequency of the signal.
+///     frame_length (float): The length of the frame in second.
+///     frame_stride (float): The stride between frames.
+///     filter (array): The time-domain filter for applying to each frame. By default it is one so nothing will be changed.
+///     zero_padding (bool): If the samples is not a multiple of frame_length(number of frames sample), zero padding will be done for generating last frame.
+/// Returns:
+///     Stacked_frames-Array of frames of size (number_of_frames x frame_len).
 pub fn stack_frames(
     sig: Array1<f64>,
     sampling_frequency: usize,
@@ -75,15 +61,7 @@ pub fn stack_frames(
                         ))*/
     zero_padding: bool, /*=True*/
 ) -> Array2<f64> {
-    // Check dimension
-    //not necessary due to function type signature
-    // assert!(
-    //     sig.ndim() == 1,
-    //     &format!(
-    //         "Signal dimention should be of the format of (N,) but it is {:?} instead",
-    //         sig.shape()
-    //     )
-    // );
+    
 
     // Initial necessary values
     let length_signal = sig.len();
@@ -98,11 +76,7 @@ pub fn stack_frames(
     let signal = if zero_padding {
         // Calculation of number of frames
         numframes = ((length_signal - frame_sample_length) as f64 / frame_stride).ceil() as usize;
-        println!(
-            "{} {} {} {}",
-            numframes, length_signal, frame_sample_length, frame_stride
-        );
-
+        
         // Zero padding
         len_sig = (numframes as f64 * frame_stride) as usize + frame_sample_length;
         let additive_zeros =
@@ -234,17 +208,13 @@ fn log_power_spectrum(
     }
 }
 
-/*
-This function the derivative features.
-    Args:
-        feat (array): The main feature vector(For returning the second
-             order derivative it can be first-order derivative).
-        DeltaWindows (int): The value of  DeltaWindows is set using
-            the configuration parameter DELTAWINDOW.
-    Returns:
-           array: Derivative feature vector - A NUMFRAMESxNUMFEATURES numpy
-           array which is the derivative features along the features.
-*/
+
+/// This function extracts the derivative features.
+/// Args:
+///     feat : The main feature vector(For returning the second order derivative it can be first-order derivative).
+///     DeltaWindows : The value of  DeltaWindows is set using the configuration parameter DELTAWINDOW.
+/// Returns:
+///     A NUMFRAMESxNUMFEATURES array which is the derivative features along the features.
 pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<f64> {
     // Getting the shape of the vector.
     let cols = feat.shape()[1];
@@ -278,23 +248,17 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
 
     DIF / Scale
 }
-//NOTE: determine if they are using tiling for broadcasting or
-//if so this code may be simplified
-//see note attached to definition of numpy tile
-//see https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#broadcasting
-/**
- * This function is aimed to perform global cepstral mean and
-        variance normalization (CMVN) on input feature vector "vec".
-        The code assumes that there is one observation per row.
-    Args:
-        vec (array): input feature matrix
-            (size:(num_observation,num_features))
-        variance_normalization (bool): If the variance
-            normilization should be performed or not.
-    Return:
-          array: The mean(or mean+variance) normalized feature vector.
-*/
-fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
+
+/// This function is aimed to perform global cepstral mean and
+/// variance normalization (CMVN) on input feature vector "vec".
+/// The code assumes that there is one observation per row.
+/// Args:
+///     vec (array): input feature matrix
+///         (size:(num_observation,num_features))
+/// variance_normalization (bool): If the variance normalization should be performed or not.
+/// Return:
+///     array: The mean(or mean+variance) normalized feature vector.
+pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
     let eps = 2.0f64.powf(-30.);
     let rows = vec.shape()[0];
 

@@ -1,19 +1,7 @@
-/**feature module.
-This module provides functions for calculating the main speech
-features that the package is aimed to extract as well as the required
-elements.
-Functions:
-    filterbanks: Compute the Mel-filterbanks
-                 The filterbanks must be created for extracting
-                 speech features such as MFCC.
-    mfcc: Extracting Mel Frequency Cepstral Coefficient feature.
-    mfe: Extracting Mel Energy feature.
-    lmfe: Extracting Log Mel Energy feature.
-    extract_derivative_feature: Extract the first and second derivative
-        features. This finction, directly use the ``derivative_extraction``
-        function in the ``processing`` module.
-*/
-use crate::functions::{frequency_to_mel, mel_to_frequency, triangle, zero_handling};
+
+/// This module provides functions for calculating the main speech
+/// features that the package is aimed to extract as well as the required elements.
+use crate::functions::{frequency_to_mel, triangle, zero_handling, mel_arr_to_frequency};
 use crate::processing::stack_frames;
 use crate::util::ArrayLog;
 
@@ -23,26 +11,19 @@ use ndarray::{
 };
 use ndrustfft::{nddct2, DctHandler};
 
-/*from __future__ import division
-import numpy as np
-from . import processing
-from scipy.fftpack import dct
-from . import functions*/
 
-/**Compute the Mel-filterbanks. Each filter will be stored in one rows.
-The columns correspond to fft bins.
-Args:
-    num_filter (int): the number of filters in the filterbank, default 20.
-    coefficients (int): (fftpoints//2 + 1). Default is 257.
-    sampling_freq (float): the samplerate of the signal we are working
-        with. It affects mel spacing.
-    low_freq (float): lowest band edge of mel filters, default 0 Hz
-    high_freq (float): highest band edge of mel filters,
-        default samplerate/2
-Returns:
-        array: A numpy array of size num_filter x (fftpoints//2 + 1)
-            which are filterbank
-*/
+/// Compute the Mel-filterbanks. Each filter will be stored in one rows.
+///The columns correspond to fft bins.
+/// Args:
+///     num_filter : the number of filters in the filterbank, default 20.
+///     coefficients : (fftpoints//2 + 1). Default is 257.
+///     sampling_freq : the sample rate of the signal we are working with. It affects mel spacing.
+///     low_freq : lowest band edge of mel filters, default 0 Hz
+///     high_freq : highest band edge of mel filters,
+///         default samplerate/2
+/// Returns:
+///         array: A numpy array of size num_filter x (fftpoints//2 + 1)
+///             which are filterbank
 pub fn filterbanks(
     num_filter: usize,
     coefficients: usize,
@@ -74,7 +55,7 @@ pub fn filterbanks(
     // The frequency resolution required to put filters at the
     // exact points calculated above should be extracted.
     //  So we should round those frequencies to the closest FFT bin.
-    let freq_index = mel_to_frequency(mels)
+    let freq_index = mel_arr_to_frequency(mels)
         .map(|x| ((coefficients as i32 + 1) as f64 * x / sampling_freq) as usize);
 
     // Initial definition
@@ -97,33 +78,33 @@ pub fn filterbanks(
     filterbank
 }
 
-/**Compute MFCC features from an audio signal.
-    Args:
-         signal (array): the audio signal from which to compute features.
-             Should be an N x 1 array
-         sampling_frequency (int): the sampling frequency of the signal
-             we are working with.
-         frame_length (float): the length of each frame in seconds.
-             Default is 0.020s
-         frame_stride (float): the step between successive frames in seconds.
-             Default is 0.02s (means no overlap)
-         num_filters (int): the number of filters in the filterbank,
-             default 40.
-         fft_length (int): number of FFT points. Default is 512.
-         low_frequency (float): lowest band edge of mel filters.
-             In Hz, default is 0.
-         high_frequency (float): highest band edge of mel filters.
-             In Hz, default is samplerate/2
-         num_cepstral (int): Number of cepstral coefficients.
-         dc_elimination (bool): hIf the first dc component should
-             be eliminated or not.
-    Returns:
-        array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
-*/
 //TODO: verify return type after running, may need to
 //convert to dynamic dimensions (IxDyn) if input varies between
 //1 and 2d output
 // see https://docs.rs/ndarray/latest/ndarray/type.IxDyn.html
+
+/// Compute MFCC features from an audio signal.
+///     Args:
+///          signal : the audio signal from which to compute features.
+///              Should be an N x 1 array
+///          sampling_frequency : the sampling frequency of the signal
+///              we are working with.
+///          frame_length : the length of each frame in seconds.
+///              Default is 0.020s
+///          frame_stride : the step between successive frames in seconds.
+///              Default is 0.02s (means no overlap)
+///          num_filters : the number of filters in the filterbank,
+///              default 40.
+///          fft_length : number of FFT points. Default is 512.
+///          low_frequency : lowest band edge of mel filters.
+///              In Hz, default is 0.
+///          high_frequency (float): highest band edge of mel filters.
+///              In Hz, default is samplerate/2
+///          num_cepstral (int): Number of cepstral coefficients.
+///          dc_elimination (bool): hIf the first dc component should
+///              be eliminated or not.
+///     Returns:
+///         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
 pub fn mfcc(
     signal: Array1<f64>,
     sampling_frequency: usize,
@@ -196,32 +177,30 @@ where
     return feature;
 }
 
-fn f_it(x: usize) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
+///a helper function that is passed to stack_frames from mfe
+fn _f_it(x: usize) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
     Array1::<f64>::ones(x as usize)
 }
-/**
-* """Compute Mel-filterbank energy features from an audio signal.
 
-   Args:
-        signal (array): the audio signal from which to compute features.
-            Should be an N x 1 array
-        sampling_frequency (int): the sampling frequency of the signal
-            we are working with.
-        frame_length (float): the length of each frame in seconds.
-            Default is 0.020s
-        frame_stride (float): the step between successive frames in seconds.
-            Default is 0.02s (means no overlap)
-        num_filters (int): the number of filters in the filterbank,
-            default 40.
-        fft_length (int): number of FFT points. Default is 512.
-        low_frequency (float): lowest band edge of mel filters.
-            In Hz, default is 0.
-        high_frequency (float): highest band edge of mel filters.
-            In Hz, default is samplerate/2
-   Returns:
-             array: features - the energy of fiterbank of size num_frames x num_filters. The energy of each frame: num_frames x 1
-   */
-
+/// Compute Mel-filterbank energy features from an audio signal.
+///    Args:
+///         signal: the audio signal from which to compute features.
+///             Should be an N x 1 array
+///         sampling_frequency : the sampling frequency of the signal
+///             we are working with.
+///         frame_length : the length of each frame in seconds.
+///             Default is 0.020s
+///         frame_stride : the step between successive frames in seconds.
+///             Default is 0.02s (means no overlap)
+///         num_filters : the number of filters in the filterbank,
+///             default 40.
+///         fft_length : number of FFT points. Default is 512.
+///         low_frequency : lowest band edge of mel filters.
+///             In Hz, default is 0.
+///         high_frequency : highest band edge of mel filters.
+///             In Hz, default is samplerate/2
+///    Returns:
+///              array: features - the energy of fiterbank of size num_frames x num_filters. The energy of each frame: num_frames x 1
 fn mfe(
     signal: Array1<f64>,
     sampling_frequency: usize,
@@ -232,19 +211,16 @@ fn mfe(
     low_frequency: f64,          /*=0*/
     high_frequency: Option<f64>, /*None*/
 ) -> (Array2<f64>, Array1<f64>) {
-    // Convert to float
-    //let signal = signal.type(float);
-    let f = |x: i32| -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
-        Array1::<f64>::ones(x as usize)
-    };
+    
+    
     // Stack frames
     let frames = stack_frames(
         signal,
         sampling_frequency,
         frame_length,
         frame_stride,
-        f_it,
-        false, /*=False*/
+        _f_it,
+        false, 
     );
 
     // getting the high frequency
@@ -275,27 +251,26 @@ fn mfe(
     (features, frame_energies)
 }
 
-/**
-*     """Compute log Mel-filterbank energy features from an audio signal.
-   Args:
-        signal (array): the audio signal from which to compute features.
-            Should be an N x 1 array
-        sampling_frequency (int): the sampling frequency of the signal
-            we are working with.
-        frame_length (float): the length of each frame in seconds.
-            Default is 0.020s
-        frame_stride (float): the step between successive frames in seconds.
-            Default is 0.02s (means no overlap)
-        num_filters (int): the number of filters in the filterbank,
-            default 40.
-        fft_length (int): number of FFT points. Default is 512.
-        low_frequency (float): lowest band edge of mel filters.
-            In Hz, default is 0.
-        high_frequency (float): highest band edge of mel filters.
-            In Hz, default is samplerate/2
-   Returns:
-        array: Features - The log energy of fiterbank of size num_frames x num_filters frame_log_energies. The log energy of each frame num_frames x 1
-*/
+
+/// Compute log Mel-filterbank energy features from an audio signal.
+///    Args:
+///         signal : the audio signal from which to compute features.
+///             Should be an N x 1 array
+///         sampling_frequency : the sampling frequency of the signal
+///             we are working with.
+///         frame_length : the length of each frame in seconds.
+///             Default is 0.020s
+///         frame_stride : the step between successive frames in seconds.
+///             Default is 0.02s (means no overlap)
+///         num_filters : the number of filters in the filterbank,
+///             default 40.
+///         fft_length : number of FFT points. Default is 512.
+///         low_frequency : lowest band edge of mel filters.
+///             In Hz, default is 0.
+///         high_frequency : highest band edge of mel filters.
+///             In Hz, default is samplerate/2
+///    Returns:
+///         array: Features - The log energy of fiterbank of size num_frames x num_filters frame_log_energies. The log energy of each frame num_frames x 1
 fn lmfe(
     signal: Array1<f64>,
     sampling_frequency: usize,
@@ -319,14 +294,13 @@ fn lmfe(
     feature.log()
 }
 
-/**
-    This function extracts temporal derivative features which are
-        first and second derivatives.
-    Args:
-        feature (array): The feature vector which its size is: N x M
-    Return:
-          array: The feature cube vector which contains the static, first and second derivative features of size: N x M x 3
-*/
+
+/// extracts temporal derivative features which are first and second derivatives.
+/// uses the derivative extraction function from the processing module
+/// Args:
+///     feature : The feature vector which its size is: N x M
+/// Return:
+///     array: The feature cube vector which contains the static, first and second derivative features of size: N x M x 3
 fn extract_derivative_feature(feature: Array2<f64>) -> Array3<f64> {
     let first_derivative_feature = crate::processing::derivative_extraction(&feature, 2);
     let second_derivative_feature =
@@ -344,3 +318,4 @@ fn extract_derivative_feature(feature: Array2<f64>) -> Array3<f64> {
 
     feature_cube
 }
+

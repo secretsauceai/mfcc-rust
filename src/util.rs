@@ -1,3 +1,5 @@
+/// for all the stuff that doesn't yet exist in rust but is outside the scope of the crate
+
 use std::{fmt::format, iter::zip};
 
 use ndarray::{
@@ -5,7 +7,7 @@ use ndarray::{
     Dimension, IntoDimension, IxDyn, IxDynImpl, OwnedRepr, Slice, Zip,
 };
 
-//for all the stuff that doesn't exist
+
 
 /// from numpy docs:
 /// Construct an array by repeating A the number of times given by reps.
@@ -17,16 +19,16 @@ use ndarray::{
 /// If `A.ndim > d`, `reps` is promoted to `A`.ndim by pre-pending 1's to it. Thus for an `A` of shape (2, 3, 4, 5), a `reps` of (2, 2) is treated as (1, 1, 2, 2).
 
 /// Note : Although tile may be used for broadcasting, it is strongly recommended to use numpy's broadcasting operations and functions. */
-pub enum PadType {
+pub(crate) enum PadType {
     Constant,
     Symmetric,
     Edge, //may add more
 }
-pub enum EdgeRowOp {
+pub(crate) enum EdgeRowOp {
     Top,
     Bottom,
 }
-pub enum EdgeColOp {
+pub(crate) enum EdgeColOp {
     Left,
     Right,
 }
@@ -151,7 +153,7 @@ fn _new_shape(num_of_reps: usize, array_dims: usize, reps: &mut Vec<usize>) {
 /// TODO: currently having issue with the generic arguments, may need to change
 /// potentially relevant SO post: https://stackoverflow.com/questions/61758934/how-can-i-write-a-generic-function-that-takes-either-an-ndarray-array-or-arrayvi
 
-pub fn pad<A, D>(
+pub(crate) fn pad<A, D>(
     arr: &Array<A, D>,
     pad_width: Vec<[usize; 2]>,
     const_value: A,
@@ -332,7 +334,7 @@ fn edge_pad<A, D>(
     A: Clone,
     D: Dimension,
 {
-    let mut sub_len = 0_usize;
+    //let mut sub_len: usize;
     let mut range_start: isize;
     let mut range_stop: isize;
     for (ax, (&ax_len, &[pre_ax, post_ax])) in

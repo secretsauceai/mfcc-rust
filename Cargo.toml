@@ -10,3 +10,7 @@ ndarray="^0.15"
 ndrustfft = "^0.3"
 num-traits = "0.2.15"
 
+[dev-dependencies]
+ndarray={version="^0.15",features=["approx"]}
+ndarray-rand = "0.14.0"
+
