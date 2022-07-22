@@ -179,7 +179,7 @@ where
 
 ///a helper function that is passed to stack_frames from mfe
 fn _f_it(x: usize) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
-    Array1::<f64>::ones(x as usize)
+    Array1::<f64>::ones(x)
 }
 
 /// Compute Mel-filterbank energy features from an audio signal.

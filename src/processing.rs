@@ -28,7 +28,7 @@ use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 ///     cof (float): The preemphasising coefficient. 0 equals to no filtering.
 /// Returns:
 ///     The pre-emphasized signal.
-fn preemphasis(signal: Array1<f64>, shift: i32 /*1*/, cof: f64 /*=0.98*/) -> Array1<f64> {
+pub fn preemphasis(signal: Array1<f64>, shift: isize /*1*/, cof: f64 /*=0.98*/) -> Array1<f64> {
     //Note: https://github.com/rust-ndarray/ndarray/issues/281
 
     //let rolled_signal = np.roll(signal, shift);
@@ -114,7 +114,7 @@ pub fn stack_frames(
         })
         .into_dimensionality::<Ix2>()
         .expect("failed to convert frames into 2D array");
-
+    
     let window = tile::<f64, Ix1>(&filter(frame_sample_length), vec![numframes, 1])
         .into_dimensionality::<Ix2>()
         .expect("failed to convert window into 2d array");

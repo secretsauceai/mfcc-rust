@@ -6,11 +6,12 @@ pub mod util;
 
 #[cfg(test)]
 mod tests {
-    use ndarray::Array;
+    use ndarray::{Array, Array1};
     use ndarray_rand::RandomExt;
     use ndarray_rand::rand_distr::{Normal,Uniform};
     use crate::feature::mfcc;
-    use crate::processing::cmvn;
+    use crate::functions::frequency_to_mel;
+    use crate::processing::{cmvn, preemphasis, stack_frames};
 
     
 
@@ -26,11 +27,26 @@ mod tests {
 
     #[test]
     fn test_preprocessing(){
-        todo!()
+        let signal = create_signal();
+        let coeff = 0.98;
+        let signal_preemphasized = preemphasis(signal.clone(),1,coeff);
+        assert_eq!(signal_preemphasized.ndim(),1);
+        assert_eq!(signal_preemphasized.shape(), signal.shape());
     }
 
     fn test_stack_frames(){
-        todo!()
+        let signal = create_signal();
+        let freq=sampling_frequency();
+        let frame_length=0.02;
+        let frame_stride=0.02;
+        let filter: fn(usize) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> = |x:usize| -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {Array1::<f64>::ones(x)};
+        let zero_padding=true;
+        let frames=stack_frames(signal.clone(), freq, frame_length, frame_stride, filter, zero_padding);
+        let window = (frame_length * freq as f64).round();
+        let step = (frame_stride * freq as f64).round();
+        let all_frames = ((signal.shape()[0] as f64 - window)/step).ceil() as usize;
+        assert_eq!(all_frames,frames.shape()[0])
+
     } 
 
     #[test]
