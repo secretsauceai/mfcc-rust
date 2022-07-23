@@ -99,17 +99,17 @@ where
             if nrep != 1 {
                 //shape (2,4) should return 4
                 println!("res len: {:?}, n: {:?}, nrep: {:?}",res.len(),n,nrep);
-                first_dim = res.len()-n;
-                first_dim = if first_dim>0 {first_dim} else {1};
+                first_dim = res.len()/n;
+                //first_dim = if first_dim>0 {first_dim} else {1};
                 res = res
                     .into_shape([first_dim, n])
                     .expect(&format!(
-                        "error reshaping result into shape {:?} , {:?}",
+                        "error reshaping result into shape ( {:?} , {:?} )",
                         first_dim, n,
                     ));
                 println!("starting repeat");
                 res = repeat(&res, nrep);
-                
+                println!("finished repeat");
             }
             n = n / *dim_in;
         }
@@ -121,22 +121,21 @@ where
         .expect("trouble reshaping output");
 }
 
-fn repeat<A, D>(arr: &ArrayBase<OwnedRepr<A>, D>, nrep: usize) -> Array2<A>
+//this works for how repeat is called in our project
+fn repeat<A>(arr: &Array2<A>, nrep: usize) -> Array2<A>
 where
     A: Clone + std::fmt::Display + num_traits::Zero,
-    D: Dimension,
+    
 {
+    println!("orig axis len: {:?}",arr.shape()[0]);
     let repeat_axis_len = arr.shape()[0] * nrep;
+    
     let mut res = ndarray::Array2::<A>::zeros((repeat_axis_len, arr.shape()[1]));
     println!("res shape: {:?}",res.shape());
-    for (i, ax) in arr.lanes(Axis(0)).into_iter().enumerate() {
-        let lo = i * nrep;
-        let hi = (lo) + (nrep - 1);
-        println!("lo {:?}, hi {:?}",lo,hi);
-        for j in lo..hi {
-            let mut current_axis = res.index_axis_mut(Axis(0), j);
-            current_axis.assign(&ax);
-        }
+    let repeated_row=arr.row(0);
+    //this works for how repeat is called in our project
+    for mut current_row in res.axis_iter_mut(Axis(0)) {
+        current_row.assign(&repeated_row.clone()); 
     }
     res
 }
@@ -478,8 +477,20 @@ impl<A: num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<
 
 #[cfg(test)]
 mod test {
+    use ndarray::array;
+
+    use super::*;
+
     #[test]
     fn tile_test() {
-        todo!()
+        let arr1=array![[0,1,2]];
+        assert_eq!(tile(&arr1,vec![2,2]),array![[0,1,2,0,1,2],[0,1,2,0,1,2]].into_dyn());
+        assert_eq!(tile(&array![[1,2],[3,4]],vec![2,1]),array![[1,2],[3,4],[1,2],[3,4]].into_dyn());
+    }
+
+    #[test]
+    fn repeat_test() {
+        let input_arr=array![[1,2,3,4]];
+        assert_eq!(repeat(&input_arr,2),array![[1,2,3,4],[1,2,3,4]])
     }
 }

@@ -61,16 +61,20 @@ pub fn filterbanks(
     // Initial definition
     let mut filterbank = Array2::zeros([num_filter, coefficients]);
 
+    println!("starting to loop through filters");
     // The triangular function for each filter
     for i in 0..num_filter {
+        
         let left = freq_index[i] as f64;
         let middle = freq_index[i + 1] as f64;
         let right = freq_index[i + 2] as f64;
+        println!("defining z");
         let z = Array1::<f64>::linspace(left, right, right as usize - left as usize + 1);
-
+        
         {
             let mut s: ArrayViewMut1<f64> =
                 filterbank.slice_mut(s![i, left as usize..right as usize + 1]);
+            println!("starting triangle");
             triangle(&mut s, z, left, middle, right);
         }
     }
@@ -118,7 +122,8 @@ pub fn mfcc(
     dc_elimination: bool,        //True
 ) -> Array2<f64>
 where
-{
+{   
+    println!("starting mfe");
     let (mut feature, energy) = mfe(
         signal,
         sampling_frequency,
@@ -129,6 +134,7 @@ where
         low_frequency,
         high_frequency,
     );
+    println!("finished mfe");
 
     if feature.len() == 0 {
         return Array::<f64, _>::zeros((0_usize, num_cepstral));
@@ -160,8 +166,9 @@ where
             *x * (1. / (2. * n).sqrt())
         }
     });
+    println!("grabbing feature slice");
     feature.slice(s![.., ..num_cepstral]);
-
+    println!("grabbed feature slice");
     // replace first cepstral coefficient with log of frame energy for DC
     // elimination.
     if dc_elimination {
@@ -222,7 +229,7 @@ fn mfe(
         _f_it,
         false, 
     );
-
+    println!("finished stack frames");
     // getting the high frequency
     let high_frequency = high_frequency.unwrap_or(sampling_frequency as f64 / 2.);
 
@@ -232,7 +239,7 @@ fn mfe(
     // this stores the total energy in each frame
     let frame_energies = power_spectrum.sum_axis(Axis(1));
 
-    // Handling zero enegies.
+    // Handling zero energies.
     let frame_energies = zero_handling(frame_energies);
 
     // Extracting the filterbank
@@ -243,7 +250,7 @@ fn mfe(
         Some(low_frequency),
         Some(high_frequency),
     );
-
+    println!("finished filterbanks");
     // Filterbank energies
     let features = power_spectrum.dot(&filter_banks.reversed_axes());
     let features = crate::functions::zero_handling(features);

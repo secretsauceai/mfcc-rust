@@ -261,7 +261,7 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
 pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
     let eps = 2.0f64.powf(-30.);
     let rows = vec.shape()[0];
-
+    println!("cmvn rows: {:?}",rows);
     // Mean calculation
     let norm = &vec.mean_axis(Axis(0)).unwrap();
     let norm_vec = tile::<f64, Ix1>(norm, vec![rows, 1]);
@@ -272,9 +272,9 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     // Variance normalization
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
-
+        println!("starting std tile");
         let stdev_vec = tile::<f64, ndarray::IxDyn>(&stdev, vec![rows, 1]);
-
+        println!("std tile complete");
         (mean_subtracted / (stdev_vec + eps))
             .into_dimensionality::<Ix2>()
             .expect("error shaping output of cmvn with variance normalization")
