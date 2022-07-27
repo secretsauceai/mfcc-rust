@@ -16,7 +16,7 @@ Attributes:
 
 use std::ops::Mul;
 
-use crate::util::{pad, tile, PadType};
+use crate::util::{pad, repeat_axis, PadType};
 use ndarray::{azip, s, Array1, Array2, Axis, Dimension, Ix1, Ix2};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 
@@ -56,7 +56,7 @@ pub fn stack_frames(
     sampling_frequency: usize,
     frame_length: f64, /*=0.020*/
     frame_stride: f64, /*=0.020*/
-    filter: fn(usize) -> Array1<f64>, /*=lambda x: np.ones(
+    filter: Option<fn(usize) -> Array2<f64>>, /*=lambda x: np.ones(
                        (x,
                         ))*/
     zero_padding: bool, /*=True*/
@@ -66,7 +66,7 @@ pub fn stack_frames(
     // Initial necessary values
     let length_signal = sig.len();
     let frame_sample_length = (sampling_frequency as f64 * frame_length).round() as usize; // Defined by the number of samples
-    let frame_stride = (sampling_frequency as f64 * frame_stride).round();
+    let frame_stride = ((sampling_frequency as f64 * frame_stride).round()) as usize;
     let mut len_sig: usize;
     let mut numframes: usize;
 
@@ -74,35 +74,39 @@ pub fn stack_frames(
     //let the below if else declare the last index
     // Zero padding is done for allocating space for the last frame.
     let signal = if zero_padding {
+        //TODO: simplify once this makes its way to stable:
+        //https://github.com/rust-lang/rust/issues/88581
         // Calculation of number of frames
-        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride).ceil() as usize;
+        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride as f64).ceil() as usize;
         
         // Zero padding
-        len_sig = (numframes as f64 * frame_stride) as usize + frame_sample_length;
+        len_sig = (numframes * frame_stride)  + frame_sample_length;
         let additive_zeros =
             ndarray::Array::<f64, Ix1>::zeros(((len_sig - length_signal) as usize,));
         ndarray::concatenate![Axis(0), sig, additive_zeros]
     } else {
         // No zero padding! The last frame which does not have enough
         // samples(remaining samples <= frame_sample_length), will be dropped!
-        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride) as usize;
+        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride as f64) as usize;
 
         // new length
         let len_sig =
-            ((numframes - 1) as f64 * frame_stride) as usize + frame_sample_length as usize;
+            ((numframes - 1)  * frame_stride) as usize + frame_sample_length as usize;
         sig.slice_move(s![0..len_sig])
     };
 
     // Getting the indices of all frames.
-    let indices = tile::<f64, Ix1>(
-        &ndarray::Array::range(0., frame_sample_length as f64, 1.),
-        vec![numframes, 1],
-    ) + tile::<f64, Ix1>(
-        &ndarray::Array::range(0., numframes as f64 * frame_stride, frame_stride),
-        vec![frame_sample_length, 1],
+    let indices = repeat_axis(
+        ndarray::Array::from_iter(0..frame_sample_length).into_shape((1,frame_sample_length)).unwrap().view(),
+        Axis(0),
+        numframes,
+    ) + repeat_axis(
+        ndarray::Array::from_iter((0..numframes * frame_stride).step_by(frame_stride)).into_shape((frame_stride,1)).unwrap().view(),
+        Axis(0),
+        frame_sample_length,
     )
     .t();
-    let indices = indices.mapv(|v| v as usize);
+    //let indices = indices.mapv(|v| v as usize);
 
     // Extracting the frames based on the allocated indices.
     let frames = indices
@@ -111,16 +115,16 @@ pub fn stack_frames(
                 "code panicked when trying to access element {} of ndarray signal.\n\n signal:\n{}",
                 i, signal
             ))
-        })
-        .into_dimensionality::<Ix2>()
-        .expect("failed to convert frames into 2D array");
+        });
+        
+        
+    if let Some(f) = filter{
+        let filt=f(frame_sample_length);
+    let window = repeat_axis(filt.view(), Axis(0), numframes);    
+        return frames * window;
+    }
     
-    let window = tile::<f64, Ix1>(&filter(frame_sample_length), vec![numframes, 1])
-        .into_dimensionality::<Ix2>()
-        .expect("failed to convert window into 2d array");
-
-    //NOTE: frames is Nx1, window is Mx1, so result is MxN
-    frames * window // Extracted frames
+    return frames;
 }
 
 /*    This function computes the one-dimensional n-point discrete Fourier
@@ -263,8 +267,9 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     let rows = vec.shape()[0];
     println!("cmvn rows: {:?}",rows);
     // Mean calculation
-    let norm = &vec.mean_axis(Axis(0)).unwrap();
-    let norm_vec = tile::<f64, Ix1>(norm, vec![rows, 1]);
+    let norm = vec.mean_axis(Axis(0)).unwrap();
+    let norm_len=norm.len();
+    let norm_vec = repeat_axis(norm.into_shape((1,norm_len)).unwrap().view(),Axis(0), rows);
     println!("tile complete");
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
@@ -272,8 +277,9 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     // Variance normalization
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
+        let stdev_len=stdev.len();
         println!("starting std tile");
-        let stdev_vec = tile::<f64, ndarray::IxDyn>(&stdev, vec![rows, 1]);
+        let stdev_vec = repeat_axis(stdev.into_shape((1,stdev_len)).unwrap().view(), Axis(0),rows);
         println!("std tile complete");
         (mean_subtracted / (stdev_vec + eps))
             .into_dimensionality::<Ix2>()

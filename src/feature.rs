@@ -185,8 +185,8 @@ where
 }
 
 ///a helper function that is passed to stack_frames from mfe
-fn _f_it(x: usize) -> ArrayBase<OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
-    Array1::<f64>::ones(x)
+fn _f_it(x: usize) -> Array2<f64> {
+    Array2::<f64>::ones((x,1))
 }
 
 /// Compute Mel-filterbank energy features from an audio signal.
@@ -226,7 +226,7 @@ fn mfe(
         sampling_frequency,
         frame_length,
         frame_stride,
-        _f_it,
+        None,
         false, 
     );
     println!("finished stack frames");

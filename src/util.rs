@@ -4,7 +4,7 @@ use std::{fmt::format, iter::zip};
 
 use ndarray::{
     azip, Array, Array1, Array2, ArrayBase, ArrayD, ArrayView, ArrayViewMut, Axis, Dim, DimMax,
-    Dimension, IntoDimension, IxDyn, IxDynImpl, OwnedRepr, Slice, Zip,
+    Dimension, IntoDimension, IxDyn, IxDynImpl, OwnedRepr, Slice, Zip, ArrayView2,
 };
 
 
@@ -108,7 +108,7 @@ where
                         first_dim, n,
                     ));
                 println!("starting repeat");
-                res = repeat(&res, nrep);
+                res = repeat_axis(res.view(),Axis(0), nrep);
                 println!("finished repeat");
             }
             n = n / *dim_in;
@@ -122,21 +122,21 @@ where
 }
 
 //this works for how repeat is called in our project
-fn repeat<A>(arr: &Array2<A>, nrep: usize) -> Array2<A>
+pub(crate) fn repeat_axis<A>(arr: ArrayView2<A>, ax:Axis, nrep: usize) -> Array2<A>
 where
     A: Clone + std::fmt::Display + num_traits::Zero,
     
 {
     println!("orig axis len: {:?}",arr.shape()[0]);
     let repeat_axis_len = arr.shape()[0] * nrep;
-    
-    let mut res = ndarray::Array2::<A>::zeros((repeat_axis_len, arr.shape()[1]));
-    println!("res shape: {:?}",res.shape());
-    let repeated_row=arr.row(0);
-    //this works for how repeat is called in our project
-    for mut current_row in res.axis_iter_mut(Axis(0)) {
-        current_row.assign(&repeated_row.clone()); 
-    }
+    let res = ndarray::concatenate(ax, &vec![arr;nrep]).unwrap();
+    // let mut res = ndarray::Array2::<A>::zeros((repeat_axis_len, arr.shape()[1]));
+    // println!("res shape: {:?}",res.shape());
+    // let repeated_row=arr.row(0);
+    // //this works for how repeat is called in our project
+    // for mut current_row in res.axis_iter_mut(Axis(0)) {
+    //     current_row.assign(&repeated_row.clone()); 
+    // }
     res
 }
 
@@ -478,19 +478,31 @@ impl<A: num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<
 #[cfg(test)]
 mod test {
     use ndarray::array;
-
+    use ndarray::concatenate;
     use super::*;
 
+    //#[test]
+    // fn tile_test() {
+    //     let arr1=array![[0,1,2]];
+    //     assert_eq!(tile(&arr1,vec![2,2]),array![[0,1,2,0,1,2],[0,1,2,0,1,2]].into_dyn());
+    //     assert_eq!(tile(&array![[1,2],[3,4]],vec![2,1]),array![[1,2],[3,4],[1,2],[3,4]].into_dyn());
+    // }
+
     #[test]
-    fn tile_test() {
-        let arr1=array![[0,1,2]];
-        assert_eq!(tile(&arr1,vec![2,2]),array![[0,1,2,0,1,2],[0,1,2,0,1,2]].into_dyn());
-        assert_eq!(tile(&array![[1,2],[3,4]],vec![2,1]),array![[1,2],[3,4],[1,2],[3,4]].into_dyn());
+    fn tile_equiv_test(){
+        let arr1= array![[1,2],[3,4]];
+        let arr2=array![[1,2,3,4]];
+        //these two assertions are from the examples in the numpy docs for tiling with reps all one save
+        //for first value
+        //https://numpy.org/doc/stable/reference/generated/numpy.tile.html
+        assert_eq!(concatenate![Axis(0),arr1,arr1], array![[1,2],[3,4],[1,2],[3,4]]);
+        assert_eq!(repeat_axis(arr2.view(),Axis(0),4),array![[1,2,3,4],[1,2,3,4],[1,2,3,4],[1,2,3,4]])
+
     }
 
     #[test]
     fn repeat_test() {
         let input_arr=array![[1,2,3,4]];
-        assert_eq!(repeat(&input_arr,2),array![[1,2,3,4],[1,2,3,4]])
+        assert_eq!(repeat_axis(input_arr.view(),Axis(0),2),array![[1,2,3,4],[1,2,3,4]])
     }
 }

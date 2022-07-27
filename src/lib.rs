@@ -39,9 +39,9 @@ mod tests {
         let freq=sampling_frequency();
         let frame_length=0.02;
         let frame_stride=0.02;
-        let filter: fn(usize) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> = |x:usize| -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {Array1::<f64>::ones(x)};
+        //let filter: fn(usize) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> = |x:usize| -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {Array1::<f64>::ones(x)};
         let zero_padding=true;
-        let frames=stack_frames(signal.clone(), freq, frame_length, frame_stride, filter, zero_padding);
+        let frames=stack_frames(signal.clone(), freq, frame_length, frame_stride, None, zero_padding);
         let window = (frame_length * freq as f64).round();
         let step = (frame_stride * freq as f64).round();
         let all_frames = ((signal.shape()[0] as f64 - window)/step).ceil() as usize;
