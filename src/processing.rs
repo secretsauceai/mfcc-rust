@@ -108,19 +108,18 @@ pub fn stack_frames(
     return frames;
 }
 
-/*    This function computes the one-dimensional n-point discrete Fourier
-    Transform (DFT) of a real-valued array by means of an efficient algorithm
-    called the Fast Fourier Transform (FFT). Please refer to
-    https://docs.scipy.org/doc/numpy/reference/generated/numpy.fft.rfft.html
-    for further details.
-    Args:
-        frames (array): The frame array in which each row is a frame.
-        fft_points (int): The length of FFT. If fft_length is greater than frame_len, the frames will be zero-padded.
-    Returns:
-            array: The fft spectrum.
-            If frames is an num_frames x sample_per_frame matrix, output
-            will be num_frames x FFT_LENGTH.
-*/
+/// This function computes the one-dimensional n-point discrete Fourier
+/// Transform (DFT) of a real-valued array by means of an efficient algorithm
+/// called the Fast Fourier Transform (FFT). Please refer to
+/// https://docs.scipy.org/doc/numpy/reference/generated/numpy.fft.rfft.html
+/// for further details.
+///Args:
+///    frames : The frame array in which each row is a frame.
+///    fft_points : The length of FFT. If fft_length is greater than frame_len, the frames will be zero-padded.
+/// Returns:
+///     ndarray representing the The fft spectrum.
+/// If frames is an num_frames x sample_per_frame matrix, output
+/// will be num_frames x FFT_LENGTH.
 fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
     //SPECTRUM_VECTOR = np.fft.rfft(frames, n = fft_points, axis = -1, norm = None)
     //in case of fire see https://github.com/secretsauceai/mfcc-rust/issues/2
@@ -144,33 +143,31 @@ fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> 
     spectrum_vector.map(|v: &Complex<f64>| -> f64 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() as f64 })
 }
 
-/**
- * Power spectrum of each frame.
-    Args:
-        frames (array): The frame array in which each row is a frame.
-        fft_points (int): The length of FFT. If fft_length is greater than frame_len, the frames will be zero-padded.
-    Returns:
-            array: The power spectrum.
-            If frames is an num_frames x sample_per_frame matrix, output
-            will be num_frames x fft_length.
-*/
+
+/// Power spectrum of each frame.
+/// Args:
+///     frames : The frame array in which each row is a frame.
+///     fft_points : The length of FFT. If fft_length is greater than frame_len, the frames will be zero-padded.
+/// Returns:
+///         array representing The power spectrum.
+/// If frames is an num_frames x sample_per_frame matrix, output
+/// will be num_frames x fft_length.
 pub fn power_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
     fft_spectrum(frames, fft_points).map(|x| (1. / fft_points as f64) * *x)
 }
 
-/**
- * Log power spectrum of each frame in frames.
-    Args:
-        frames (array): The frame array in which each row is a frame.
-        fft_points (int): The length of FFT. If fft_length is greater than
-            frame_len, the frames will be zero-padded.
-        normalize (bool): If normalize=True, the log power spectrum
-            will be normalized.
-    Returns:
-           array: The power spectrum - If frames is an
-           num_frames x sample_per_frame matrix, output will be
-           num_frames x fft_length.
-*/
+
+/// Log power spectrum of each frame in frames.
+/// Args:
+///     frames : The frame array in which each row is a frame.
+///     fft_points : The length of FFT. If fft_length is greater than
+///         frame_len, the frames will be zero-padded.
+///     normalize : If true, the log power spectrum
+///         will be normalized.
+/// Returns:
+///         array representing The power spectrum  
+/// If frames is an (num_frames x sample_per_frame) matrix, output will be
+/// num_frames x fft_length.
 fn log_power_spectrum(
     frames: Array2<f64>,
     fft_points: usize, /*=512*/
@@ -272,21 +269,20 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     }
 }
 
-/**
-    This function is aimed to perform local cepstral mean and
-    variance normalization on a sliding window. The code assumes that
-    there is one observation per row.
-    Args:
-        vec (array): input feature matrix
-            (size:(num_observation,num_features))
-        win_size (int): The size of sliding window for local normalization.
-            Default=301 which is around 3s if 100 Hz rate is
-            considered(== 10ms frame stide)
-        variance_normalization (bool): If the variance normilization should
-            be performed or not.
-    Return:
-            array: The mean(or mean+variance) normalized feature vector.
-*/
+
+/// This function is aimed to perform local cepstral mean and
+/// variance normalization on a sliding window. 
+/// The code assumes that there is one observation per row.
+/// Args:
+///     vec : input feature matrix
+///         (size:(num_observation,num_features))
+///     win_size : The size of sliding window for local normalization.
+///         Default=301 which is around 3s if 100 Hz rate is
+///         considered(== 10ms frame stide)
+///     variance_normalization : If the variance normilization should
+///         be performed or not.
+/// Return:
+///         array: The mean(or mean+variance) normalized feature vector.
 fn cmvnw(
     vec: Array2<f64>,
     win_size: usize,              /*=301*/
