@@ -78,7 +78,7 @@ pub fn stack_frames(
         //https://github.com/rust-lang/rust/issues/88581
         // Calculation of number of frames, with the suggested edit in https://github.com/astorfi/speechpy/issues/34
         //for including the last frame length
-        numframes = ((length_signal - (frame_sample_length - frame_stride)) as f64 / frame_stride as f64).ceil() as usize;
+        numframes = ((length_signal - (frame_sample_length )) as f64 / frame_stride as f64).ceil() as usize;
         
         // Zero padding
         len_sig = (numframes * frame_stride)  + frame_sample_length;
@@ -116,6 +116,7 @@ pub fn stack_frames(
     let indices=indices_first+indices_second.t();
     println!("indices created");
     // Extracting the frames based on the allocated indices.
+    // TODO: this is waaaaaaaaaaay too slow
     let frames = indices
         .map(|i| {
             *signal.get(*i).expect(&format!(
@@ -124,7 +125,7 @@ pub fn stack_frames(
             ))
         });
         
-        
+    println!("frames extracted");
     if let Some(f) = filter{
         let filt=f(frame_sample_length);
     let window = repeat_axis(filt.view(), Axis(0), numframes);    
