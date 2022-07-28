@@ -14,7 +14,7 @@ Attributes:
 */
 
 
-use std::ops::Mul;
+use std::{ops::Mul, collections::HashSet};
 
 use crate::util::{pad, repeat_axis, PadType};
 use ndarray::{azip, s, Array1, Array2, Axis, Dimension, Ix1, Ix2};
@@ -74,10 +74,11 @@ pub fn stack_frames(
     //let the below if else declare the last index
     // Zero padding is done for allocating space for the last frame.
     let signal = if zero_padding {
-        //TODO: simplify once this makes its way to stable:
-        //https://github.com/rust-lang/rust/issues/88581
-        // Calculation of number of frames, with the suggested edit in https://github.com/astorfi/speechpy/issues/34
-        //for including the last frame length
+        // TODO: simplify once this makes its way to stable:
+        // https://github.com/rust-lang/rust/issues/88581
+        // TODO: check why the suggested edit (for including the last frame length) in issue below causes error
+        // https://github.com/astorfi/speechpy/issues/34
+        // see if implementation needs to change to address it
         numframes = ((length_signal - (frame_sample_length )) as f64 / frame_stride as f64).ceil() as usize;
         
         // Zero padding
@@ -95,37 +96,9 @@ pub fn stack_frames(
             ((numframes - 1)  * frame_stride) as usize + frame_sample_length as usize;
         sig.slice_move(s![0..len_sig])
     };
-
-    // Getting the indices of all frames.
-    let indices_first = repeat_axis(
-        ndarray::Array::from_iter(0..frame_sample_length).into_shape((1,frame_sample_length)).unwrap().view(),
-        Axis(0),
-        numframes,
-    );
-    println!("indices first shape: {:?}",indices_first.shape());
-    let tmp=ndarray::Array::from_iter((0..numframes * frame_stride).step_by(frame_stride));
-    println!("tmp shape: {:?}, frame_stride: {:?}",tmp.shape(),frame_stride);
-    println!("num frame * frame stride: {:?}",numframes * frame_stride);
-    let indices_second = repeat_axis(tmp.into_shape((1,numframes)).unwrap().view(),
-        Axis(0),
-        frame_sample_length,
-    );
+    let slice_len= numframes * frame_stride;
+    let frames = signal.slice_move(s![0..slice_len]).into_shape((numframes,frame_sample_length)).unwrap();
     
-    println!("indices second shape: {:?}",indices_second.shape());
-    //let indices = indices.mapv(|v| v as usize);
-    let indices=indices_first+indices_second.t();
-    println!("indices created");
-    // Extracting the frames based on the allocated indices.
-    // TODO: this is waaaaaaaaaaay too slow
-    let frames = indices
-        .map(|i| {
-            *signal.get(*i).expect(&format!(
-                "code panicked when trying to access element {} of ndarray signal.\n\n signal:\n{}",
-                i, signal
-            ))
-        });
-        
-    println!("frames extracted");
     if let Some(f) = filter{
         let filt=f(frame_sample_length);
     let window = repeat_axis(filt.view(), Axis(0), numframes);    
