@@ -26,7 +26,7 @@ mod tests {
     }
 
     #[test]
-    fn test_preprocessing(){
+    fn test_preemphasis(){
         let signal = create_signal();
         let coeff = 0.98;
         let signal_preemphasized = preemphasis(signal.clone(),1,coeff);
@@ -34,6 +34,7 @@ mod tests {
         assert_eq!(signal_preemphasized.shape(), signal.shape());
     }
 
+    #[test]
     fn test_stack_frames(){
         let signal = create_signal();
         let freq=sampling_frequency();
@@ -49,7 +50,7 @@ mod tests {
 
     } 
 
-    #[test]
+    //#[test]
     fn test_cmvn() {
         let variance_normalization=true;
         let feature_vector=Array::random((50,100),Uniform::new(0.,1.));
@@ -65,7 +66,7 @@ mod tests {
         assert!(output_mean.abs_diff_eq(&ndarray::Array1::ones((normalized_feature.shape()[1])),1e-8));
     }
 
-    #[test]
+    //#[test]
     fn test_mfcc() {
         
         let num_cepstral : usize=13;

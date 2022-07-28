@@ -40,7 +40,7 @@ pub fn preemphasis(signal: Array1<f64>, shift: isize /*1*/, cof: f64 /*=0.98*/) 
     signal - (cof * rolled_signal)
 }
 
-//TODO: make filter an optional closure to avoid looping over the input if no filter is provided
+
 /// Frame a signal into overlapping frames.
 /// Args:
 ///     sig (array): The audio signal to frame of size (N,).
@@ -76,8 +76,9 @@ pub fn stack_frames(
     let signal = if zero_padding {
         //TODO: simplify once this makes its way to stable:
         //https://github.com/rust-lang/rust/issues/88581
-        // Calculation of number of frames
-        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride as f64).ceil() as usize;
+        // Calculation of number of frames, with the suggested edit in https://github.com/astorfi/speechpy/issues/34
+        //for including the last frame length
+        numframes = ((length_signal - (frame_sample_length - frame_stride)) as f64 / frame_stride as f64).ceil() as usize;
         
         // Zero padding
         len_sig = (numframes * frame_stride)  + frame_sample_length;
@@ -96,18 +97,24 @@ pub fn stack_frames(
     };
 
     // Getting the indices of all frames.
-    let indices = repeat_axis(
+    let indices_first = repeat_axis(
         ndarray::Array::from_iter(0..frame_sample_length).into_shape((1,frame_sample_length)).unwrap().view(),
         Axis(0),
         numframes,
-    ) + repeat_axis(
-        ndarray::Array::from_iter((0..numframes * frame_stride).step_by(frame_stride)).into_shape((frame_stride,1)).unwrap().view(),
+    );
+    println!("indices first shape: {:?}",indices_first.shape());
+    let tmp=ndarray::Array::from_iter((0..numframes * frame_stride).step_by(frame_stride));
+    println!("tmp shape: {:?}, frame_stride: {:?}",tmp.shape(),frame_stride);
+    println!("num frame * frame stride: {:?}",numframes * frame_stride);
+    let indices_second = repeat_axis(tmp.into_shape((1,numframes)).unwrap().view(),
         Axis(0),
         frame_sample_length,
-    )
-    .t();
+    );
+    
+    println!("indices second shape: {:?}",indices_second.shape());
     //let indices = indices.mapv(|v| v as usize);
-
+    let indices=indices_first+indices_second.t();
+    println!("indices created");
     // Extracting the frames based on the allocated indices.
     let frames = indices
         .map(|i| {
