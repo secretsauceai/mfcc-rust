@@ -51,7 +51,7 @@ mod tests {
     } 
 
     
-    //#[test]
+    #[test]
     fn test_cmvn() {
         let variance_normalization=true;
         let feature_vector=Array::random((50,100),Uniform::new(0.,1.));
@@ -67,7 +67,7 @@ mod tests {
         assert!(output_mean.abs_diff_eq(&ndarray::Array1::ones((normalized_feature.shape()[1])),1e-8));
     }
 
-    //#[test]
+    #[test]
     fn test_mfcc() {
         
         let num_cepstral : usize=13;
@@ -82,7 +82,7 @@ mod tests {
         let dc_elination=true;
 
         let signal=create_signal();
-        let mfcc=mfcc(signal,sampling_frequency,frame_length,frame_stride, num_cepstral, num_filters,fft_length,low_frequency,hi_frequency,dc_elination);
+        let mfcc = mfcc(signal,sampling_frequency,frame_length,frame_stride, num_cepstral, num_filters,fft_length,low_frequency,hi_frequency,dc_elination);
         assert_eq!(mfcc.shape()[1], num_cepstral);
     }
 }

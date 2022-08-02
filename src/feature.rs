@@ -6,8 +6,8 @@ use crate::processing::stack_frames;
 use crate::util::ArrayLog;
 
 use ndarray::{
-    concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayViewMut1, Axis, Dimension,
-    NewAxis, OwnedRepr,
+    concatenate, s, Array, Array1, Array2, Array3, ArrayViewMut1, Axis, Dimension,
+    NewAxis,
 };
 use ndrustfft::{nddct2, DctHandler};
 
@@ -219,7 +219,7 @@ fn mfe(
     high_frequency: Option<f64>, /*None*/
 ) -> (Array2<f64>, Array1<f64>) {
     
-    
+    //println!("signal: {}, sampling frequency {}, frame length {}, frame stride {}");
     // Stack frames
     let frames = stack_frames(
         signal,

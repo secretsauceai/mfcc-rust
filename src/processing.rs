@@ -14,10 +14,12 @@ Attributes:
 */
 
 
-use std::{ops::Mul, collections::HashSet};
+use std::{ops::Mul};
 
 use crate::util::{pad, repeat_axis, PadType};
-use ndarray::{azip, s, Array1, Array2, Axis, Dimension, Ix1, Ix2};
+use ndarray::{Array1, Array2, Axis, Ix1, Ix2, concatenate, stack};
+use ndarray::azip;
+use ndarray::s;
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 
 
@@ -89,16 +91,28 @@ pub fn stack_frames(
     } else {
         // No zero padding! The last frame which does not have enough
         // samples(remaining samples <= frame_sample_length), will be dropped!
-        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride as f64) as usize;
+        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride as f64).floor() as usize;
 
         // new length
         let len_sig =
             ((numframes - 1)  * frame_stride) as usize + frame_sample_length as usize;
         sig.slice_move(s![0..len_sig])
     };
-    let slice_len= numframes * frame_stride;
-    let frames = signal.slice_move(s![0..slice_len]).into_shape((numframes,frame_sample_length)).unwrap();
-    
+    let slice_len= numframes * frame_sample_length;
+    println!("numframes {:?}, slice_len {:?}, frame_sample_length {:?}", numframes, slice_len, frame_sample_length);
+    //let frames = signal.slice_move(s![0..slice_len]).into_shape((numframes,frame_sample_length)).unwrap();
+    let mut frames= Array2::zeros((numframes,frame_sample_length));
+    println!("frames created");
+    frames.exact_chunks_mut((numframes,2)).into_iter().enumerate().for_each(|(i,mut row)|{
+        let end=((i/2)+1)*numframes;
+        let start=end-numframes;
+        let sig_slice=signal.slice(s![start..end]);
+        
+        //println!("sig slice len {:?}",sig_slice.len());
+        //println!("row shape {:?}",row.shape());
+        row.assign(&stack![Axis(1),sig_slice,sig_slice]);
+    });
+    println!("frames.shape() {:?}",frames.shape());
     if let Some(f) = filter{
         let filt=f(frame_sample_length);
     let window = repeat_axis(filt.view(), Axis(0), numframes);    
