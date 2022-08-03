@@ -100,19 +100,15 @@ pub fn stack_frames(
     };
     let slice_len= numframes * frame_sample_length;
     println!("numframes {:?}, slice_len {:?}, frame_sample_length {:?}", numframes, slice_len, frame_sample_length);
-    //let frames = signal.slice_move(s![0..slice_len]).into_shape((numframes,frame_sample_length)).unwrap();
-    let mut frames= Array2::zeros((numframes,frame_sample_length));
+    
+    //TODO: speed this operation up, currently causing a noticable pause in code
+    let mut frames= Array2::zeros((numframes, frame_sample_length));
     println!("frames created");
-    frames.exact_chunks_mut((numframes,2)).into_iter().enumerate().for_each(|(i,mut row)|{
-        let end=((i/2)+1)*numframes;
-        let start=end-numframes;
-        let sig_slice=signal.slice(s![start..end]);
-        
-        //println!("sig slice len {:?}",sig_slice.len());
-        //println!("row shape {:?}",row.shape());
-        row.assign(&stack![Axis(1),sig_slice,sig_slice]);
+    let sig_chunks= signal.axis_chunks_iter(Axis(0), numframes);
+    frames.exact_chunks_mut((numframes,2)).into_iter().zip(sig_chunks).for_each(|(mut frame_chunk,sig_chunk)|{
+        frame_chunk.assign(&stack![Axis(1),sig_chunk,sig_chunk]);
     });
-    println!("frames.shape() {:?}",frames.shape());
+    println!("frames assigned");
     if let Some(f) = filter{
         let filt=f(frame_sample_length);
     let window = repeat_axis(filt.view(), Axis(0), numframes);    
@@ -135,23 +131,23 @@ pub fn stack_frames(
 /// If frames is an num_frames x sample_per_frame matrix, output
 /// will be num_frames x FFT_LENGTH.
 fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
-    //SPECTRUM_VECTOR = np.fft.rfft(frames, n = fft_points, axis = -1, norm = None)
-    //in case of fire see https://github.com/secretsauceai/mfcc-rust/issues/2
-    // let real2comp = RealFftPlanner::new()
-    //     .real_planner()
-    //     .plan_fft_forward(fft_points);
-    // let mut input_vec = real2comp.make_input_vec();
-    // let mut spectrum_vector = real2comp.make_output_vec();
-    // real2comp.process(&input_vec, &output_vec);
+    println!("starting fft points");
+    let row_size = frames.shape()[0];
     let col_size = frames.shape()[1];
     let mut handler = R2cFftHandler::<f64>::new(fft_points);
-    let mut spectrum_vector = Array2::<Complex<f64>>::zeros((fft_points / 2 + 1, col_size));
+    let frames = if col_size < fft_points {
+        concatenate![Axis(1), frames, Array2::<f64>::zeros((row_size,fft_points-col_size)) ] }else{ frames };
+    
+    println!("declaring spectrum vector");
+    let mut spectrum_vector = Array2::<Complex<f64>>::zeros((row_size, fft_points / 2 + 1));
+    println!("starting ndfft_r2c");
     ndfft_r2c(
-        &frames,
-        &mut spectrum_vector,
+        &frames.view(),
+        &mut spectrum_vector.view_mut(),
         &mut handler,
-        frames.shape()[1], //this is the last axis right
+        1
     );
+    println!("finished ndfft");
     //would this work?
     //spectrum_vector.abs()
     spectrum_vector.map(|v: &Complex<f64>| -> f64 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() as f64 })

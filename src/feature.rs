@@ -232,16 +232,16 @@ fn mfe(
     println!("finished stack frames");
     // getting the high frequency
     let high_frequency = high_frequency.unwrap_or(sampling_frequency as f64 / 2.);
-
-    // calculation of the power sprectum
+    println!("frames shape: {:?}",frames.shape());
+    // calculation of the power spectrum
     let power_spectrum = crate::processing::power_spectrum(frames, fft_length);
     let coefficients = power_spectrum.shape()[1];
     // this stores the total energy in each frame
     let frame_energies = power_spectrum.sum_axis(Axis(1));
-
+    println!("starting zero handling");
     // Handling zero energies.
     let frame_energies = zero_handling(frame_energies);
-
+    println!("starting filterbanks");
     // Extracting the filterbank
     let filter_banks = filterbanks(
         num_filters as usize,

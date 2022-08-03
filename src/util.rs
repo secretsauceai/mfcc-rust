@@ -481,7 +481,7 @@ mod test {
     use ndarray::concatenate;
     use super::*;
 
-    //#[test]
+    #[test]
     // fn tile_test() {
     //     let arr1=array![[0,1,2]];
     //     assert_eq!(tile(&arr1,vec![2,2]),array![[0,1,2,0,1,2],[0,1,2,0,1,2]].into_dyn());
