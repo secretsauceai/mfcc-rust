@@ -4,7 +4,7 @@ use std::{fmt::format, iter::zip};
 
 use ndarray::{
     azip, Array, Array1, Array2, ArrayBase, ArrayD, ArrayView, ArrayViewMut, Axis, Dim, DimMax,
-    Dimension, IntoDimension, IxDyn, IxDynImpl, OwnedRepr, Slice, Zip, ArrayView2,
+    Dimension, IntoDimension, IxDyn, IxDynImpl, OwnedRepr, Slice, Zip, ArrayView2, s,
 };
 
 
@@ -165,15 +165,12 @@ fn _new_shape(current_ndims: usize, min_ndims: usize, reps: &mut Vec<usize>) {
 /// TODO: currently having issue with the generic arguments, may need to change
 /// potentially relevant SO post: https://stackoverflow.com/questions/61758934/how-can-i-write-a-generic-function-that-takes-either-an-ndarray-array-or-arrayvi
 
-pub(crate) fn pad<A, D>(
-    arr: &Array<A, D>,
+pub(crate) fn pad(
+    arr: &Array2<f64>,
     pad_width: Vec<[usize; 2]>,
-    const_value: A,
+    const_value: f64,
     pad_type: PadType,
-) -> Array<A, D>
-where
-    A: Clone,
-    D: Dimension,
+) -> Array2<f64>
 {
     assert_eq!(
         arr.ndim(),
@@ -192,7 +189,9 @@ where
     {
         // Select portion of padded array that needs to be copied from the
         // original array.
-        let mut orig_portion = padded.view_mut();
+        let row=arr.shape()[0];
+        let col=arr.shape()[1];
+        let mut orig_portion = padded.slice_mut(s![..row,..col]);
         // Copy the data from the original array.
         orig_portion.assign(arr);
         match pad_type {

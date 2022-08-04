@@ -108,7 +108,7 @@ pub fn stack_frames(
     frames.exact_chunks_mut((numframes,2)).into_iter().zip(sig_chunks).for_each(|(mut frame_chunk,sig_chunk)|{
         frame_chunk.assign(&stack![Axis(1),sig_chunk,sig_chunk]);
     });
-    println!("frames assigned");
+    println!("frames is row major: {:?}",frames.is_standard_layout());
     if let Some(f) = filter{
         let filt=f(frame_sample_length);
     let window = repeat_axis(filt.view(), Axis(0), numframes);    
@@ -136,8 +136,9 @@ fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> 
     let col_size = frames.shape()[1];
     let mut handler = R2cFftHandler::<f64>::new(fft_points);
     let frames = if col_size < fft_points {
-        concatenate![Axis(1), frames, Array2::<f64>::zeros((row_size,fft_points-col_size)) ] }else{ frames };
-    
+        
+        pad(&frames, vec![[0,0],[0, fft_points-col_size]], 0., PadType::Constant)  }else{ frames };
+    println!("frames is row major: {:?}",frames.is_standard_layout());
     println!("declaring spectrum vector");
     let mut spectrum_vector = Array2::<Complex<f64>>::zeros((row_size, fft_points / 2 + 1));
     println!("starting ndfft_r2c");
