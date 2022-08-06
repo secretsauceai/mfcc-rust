@@ -82,7 +82,7 @@ where
     //we may be able to reduce the two zips to one.
     //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
     _new_shape(num_of_reps,arr.ndim(),&mut reps);
-    println!("shape_out {:?}/n, reps: {:?}", shape_out, reps);
+    
     azip!((a in &mut shape_out, &b in &reps) *a= *a * b);
     
     
@@ -98,7 +98,7 @@ where
         for (dim_in, &nrep) in zip(&mut res.shape().to_owned(), &reps) {
             if nrep != 1 {
                 //shape (2,4) should return 4
-                println!("res len: {:?}, n: {:?}, nrep: {:?}",res.len(),n,nrep);
+                
                 first_dim = res.len()/n;
                 //first_dim = if first_dim>0 {first_dim} else {1};
                 res = res
@@ -107,9 +107,9 @@ where
                         "error reshaping result into shape ( {:?} , {:?} )",
                         first_dim, n,
                     ));
-                println!("starting repeat");
+                
                 res = repeat_axis(res.view(),Axis(0), nrep);
-                println!("finished repeat");
+                
             }
             n = n / *dim_in;
         }
@@ -127,11 +127,11 @@ where
     A: Clone + std::fmt::Display + num_traits::Zero,
     
 {
-    println!("orig axis len: {:?}",arr.shape()[0]);
+    
     let repeat_axis_len = arr.shape()[0] * nrep;
     let res = ndarray::concatenate(ax, &vec![arr;nrep]).unwrap();
     // let mut res = ndarray::Array2::<A>::zeros((repeat_axis_len, arr.shape()[1]));
-    // println!("res shape: {:?}",res.shape());
+    // 
     // let repeated_row=arr.row(0);
     // //this works for how repeat is called in our project
     // for mut current_row in res.axis_iter_mut(Axis(0)) {

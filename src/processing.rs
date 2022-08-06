@@ -32,12 +32,21 @@ use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 ///     The pre-emphasized signal.
 pub fn preemphasis(signal: Array1<f64>, shift: isize /*1*/, cof: f64 /*=0.98*/) -> Array1<f64> {
     //Note: https://github.com/rust-ndarray/ndarray/issues/281
-
-    //let rolled_signal = np.roll(signal, shift);
+    //lets use an example of a signal with 5 elements and a shift of 2
     let mut rolled_signal = Array1::<f64>::zeros(signal.shape()[0]);
+    //the original array will be divided into two chunks
+    {   
+        //first assign the right chunk of the result from the left chunk of the input
+        // in the example 0,1,2,3
+        let mut rolled_slice=rolled_signal.slice_mut(s![..shift]);
+        rolled_slice.assign(&signal.slice(s![-shift..]));
+    }
     {
-        rolled_signal += &signal.slice(s![shift..]);
-        rolled_signal -= &signal.slice(s![..-shift]);
+        //second assign the left chunk of the result for the right chunk of the input
+        //in the example 4,5
+        let mut rolled_slice=rolled_signal.slice_mut(s![shift..]);
+        rolled_slice.assign(&signal.slice(s![..-shift]));
+        
     }
     signal - (cof * rolled_signal)
 }
@@ -99,17 +108,16 @@ pub fn stack_frames(
         sig.slice_move(s![0..len_sig])
     };
     let slice_len= numframes * frame_sample_length;
-    println!("numframes {:?}, slice_len {:?}, frame_sample_length {:?}", numframes, slice_len, frame_sample_length);
     
-    //TODO: speed this operation up, currently causing a noticable pause in code
+    
     let mut frames= Array2::zeros((numframes, frame_sample_length));
-    println!("frames created");
+    
     let doubled_sig=stack![Axis(0),signal.view(),signal.view()];
     let sig_chunks= doubled_sig.exact_chunks((numframes,2));
     frames.exact_chunks_mut((numframes,2)).into_iter().zip(sig_chunks).for_each(|(mut frame_chunk,sig_chunk)|{
         frame_chunk.assign(&sig_chunk);
     });
-    println!("frames is row major: {:?}",frames.is_standard_layout());
+    
     if let Some(f) = filter{
         let filt=f(frame_sample_length);
     let window = repeat_axis(filt.view(), Axis(0), numframes);    
@@ -132,24 +140,22 @@ pub fn stack_frames(
 /// If frames is an num_frames x sample_per_frame matrix, output
 /// will be num_frames x FFT_LENGTH.
 fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
-    println!("starting fft points");
+    
     let row_size = frames.shape()[0];
     let col_size = frames.shape()[1];
     let mut handler = R2cFftHandler::<f64>::new(fft_points);
     let frames = if col_size < fft_points {
-        
-        pad(&frames, vec![[0,0],[0, fft_points-col_size]], 0., PadType::Constant)  }else{ frames };
-    println!("frames is row major: {:?}",frames.is_standard_layout());
-    println!("declaring spectrum vector");
+        pad(&frames, vec![[0,0],[0, fft_points-col_size]], 0., PadType::Constant)  }
+        else{ frames };
     let mut spectrum_vector = Array2::<Complex<f64>>::zeros((row_size, fft_points / 2 + 1));
-    println!("starting ndfft_r2c");
+    
     ndfft_r2c(
         &frames.view(),
         &mut spectrum_vector.view_mut(),
         &mut handler,
         1
     );
-    println!("finished ndfft");
+    
     //would this work?
     //spectrum_vector.abs()
     spectrum_vector.map(|v: &Complex<f64>| -> f64 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() as f64 })
@@ -255,12 +261,12 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
 pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
     let eps = 2.0f64.powf(-30.);
     let rows = vec.shape()[0];
-    println!("cmvn rows: {:?}",rows);
+    
     // Mean calculation
     let norm = vec.mean_axis(Axis(0)).unwrap();
     let norm_len=norm.len();
     let norm_vec = repeat_axis(norm.into_shape((1,norm_len)).unwrap().view(),Axis(0), rows);
-    println!("tile complete");
+    
     // Mean subtraction
     let mean_subtracted = vec - norm_vec;
 
@@ -268,9 +274,9 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
         let stdev_len=stdev.len();
-        println!("starting std tile");
+        
         let stdev_vec = repeat_axis(stdev.into_shape((1,stdev_len)).unwrap().view(), Axis(0),rows);
-        println!("std tile complete");
+        
         (mean_subtracted / (stdev_vec + eps))
             .into_dimensionality::<Ix2>()
             .expect("error shaping output of cmvn with variance normalization")
