@@ -104,9 +104,10 @@ pub fn stack_frames(
     //TODO: speed this operation up, currently causing a noticable pause in code
     let mut frames= Array2::zeros((numframes, frame_sample_length));
     println!("frames created");
-    let sig_chunks= signal.axis_chunks_iter(Axis(0), numframes);
+    let doubled_sig=stack![Axis(0),signal.view(),signal.view()];
+    let sig_chunks= doubled_sig.exact_chunks((numframes,2));
     frames.exact_chunks_mut((numframes,2)).into_iter().zip(sig_chunks).for_each(|(mut frame_chunk,sig_chunk)|{
-        frame_chunk.assign(&stack![Axis(1),sig_chunk,sig_chunk]);
+        frame_chunk.assign(&sig_chunk);
     });
     println!("frames is row major: {:?}",frames.is_standard_layout());
     if let Some(f) = filter{

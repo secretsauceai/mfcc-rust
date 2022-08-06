@@ -167,7 +167,7 @@ where
         }
     });
     println!("grabbing feature slice");
-    feature.slice(s![.., ..num_cepstral]);
+    transformed_feature = transformed_feature.slice_move(s![.., ..num_cepstral]);
     println!("grabbed feature slice");
     // replace first cepstral coefficient with log of frame energy for DC
     // elimination.
@@ -181,7 +181,7 @@ where
             replace_me.assign(&energy.log())
         }
     }
-    return feature;
+    return transformed_feature;
 }
 
 ///a helper function that is passed to stack_frames from mfe

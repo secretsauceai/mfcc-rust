@@ -56,15 +56,17 @@ mod tests {
         let variance_normalization=true;
         let feature_vector=Array::random((50,100),Uniform::new(0.,1.));
         let normalized_feature=cmvn(feature_vector.clone(),variance_normalization);
+        println!("normalized feature shape {:?}",normalized_feature.shape());
         assert_eq!(normalized_feature.shape(),feature_vector.shape());
         
         //check the standard deviation and mean of the output vector
         let output_std=normalized_feature.std_axis(ndarray::Axis(0),0.);
         let output_mean=normalized_feature.mean_axis(ndarray::Axis(0)).unwrap();
+        //println!("abs diff {:?}", (output_std));
         //TODO: verify the shape of cvmn and np.zeroes((1,x))
         //should be comparing two 1d arrays in original code
-        assert!(output_std.abs_diff_eq(&ndarray::Array1::zeros((normalized_feature.shape()[1])),1e-8));
-        assert!(output_mean.abs_diff_eq(&ndarray::Array1::ones((normalized_feature.shape()[1])),1e-8));
+        assert!(output_mean.abs_diff_eq(&ndarray::Array1::zeros((normalized_feature.shape()[1])),1e-8));
+        assert!(output_std.abs_diff_eq(&ndarray::Array1::ones((normalized_feature.shape()[1])),1e-8));
     }
 
     #[test]
@@ -83,6 +85,7 @@ mod tests {
 
         let signal=create_signal();
         let mfcc = mfcc(signal,sampling_frequency,frame_length,frame_stride, num_cepstral, num_filters,fft_length,low_frequency,hi_frequency,dc_elination);
+        println!("mfcc shape {:?}",mfcc.shape());
         assert_eq!(mfcc.shape()[1], num_cepstral);
     }
 }
