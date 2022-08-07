@@ -42,7 +42,7 @@ mod tests {
         let frame_stride=0.02;
         //let filter: fn(usize) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> = |x:usize| -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {Array1::<f64>::ones(x)};
         let zero_padding=true;
-        let frames=stack_frames(signal.clone(), freq, frame_length, frame_stride, None, zero_padding);
+        let frames=stack_frames(signal.view(), freq, frame_length, frame_stride, None, zero_padding);
         let window = (frame_length * freq as f64).round();
         let step = (frame_stride * freq as f64).round();
         let all_frames = ((signal.shape()[0] as f64 - window)/step).ceil() as usize;
@@ -55,7 +55,7 @@ mod tests {
     fn test_cmvn() {
         let variance_normalization=true;
         let feature_vector=Array::random((50,100),Uniform::new(0.,1.));
-        let normalized_feature=cmvn(feature_vector.clone(),variance_normalization);
+        let normalized_feature=cmvn(feature_vector.view(),variance_normalization);
         
         assert_eq!(normalized_feature.shape(),feature_vector.shape());
         
@@ -84,7 +84,7 @@ mod tests {
         let dc_elination=true;
 
         let signal=create_signal();
-        let mfcc = mfcc(signal,sampling_frequency,frame_length,frame_stride, num_cepstral, num_filters,fft_length,low_frequency,hi_frequency,dc_elination);
+        let mfcc = mfcc(signal.view(),sampling_frequency,frame_length,frame_stride, num_cepstral, num_filters,fft_length,low_frequency,hi_frequency,dc_elination);
         
         assert_eq!(mfcc.shape()[1], num_cepstral);
     }

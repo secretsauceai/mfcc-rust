@@ -1,24 +1,13 @@
-/// for all the stuff that doesn't yet exist in rust but is outside the scope of the crate
 
-use std::{fmt::format, iter::zip};
 
 use ndarray::{
-    azip, Array, Array1, Array2, ArrayBase, ArrayD, ArrayView, ArrayViewMut, Axis, Dim, DimMax,
-    Dimension, IntoDimension, IxDyn, IxDynImpl, OwnedRepr, Slice, Zip, ArrayView2, s,
+    Array, Array2, ArrayView, ArrayViewMut, Axis,
+    Dimension, Slice, ArrayView2, s,
 };
 
 
 
-/// from numpy docs:
-/// Construct an array by repeating A the number of times given by reps.
 
-/// If `reps` has length `d`, the result will have dimension of `max(d, A.ndim)`.
-
-/// If `A.ndim < d`, `A` is promoted to be d-dimensional by prepending new axes. So a shape (3,) array is promoted to (1, 3) for 2-D replication, or shape (1, 1, 3) for 3-D replication. If this is not the desired behavior, promote `A` to d-dimensions manually before calling this function.
-
-/// If `A.ndim > d`, `reps` is promoted to `A`.ndim by pre-pending 1's to it. Thus for an `A` of shape (2, 3, 4, 5), a `reps` of (2, 2) is treated as (1, 1, 2, 2).
-
-/// Note : Although tile may be used for broadcasting, it is strongly recommended to use numpy's broadcasting operations and functions. */
 pub(crate) enum PadType {
     Constant,
     Symmetric,
@@ -32,94 +21,7 @@ pub(crate) enum EdgeColOp {
     Left,
     Right,
 }
-///WARNING: this implementation currently doesn't match the behavior of numpy due
-/// to issues with the dimensions
-pub(crate) fn tile<A, D>(arr: &Array<A, D>, mut reps: Vec<usize>) -> Array<A, IxDyn>
-where
-    A: Clone + std::fmt::Display + num_traits::Zero,
-    D: Dimension,
-{
-    let num_of_reps = reps.len();
 
-    //just clone the array if reps is all ones
-
-    let mut bail_flag = true;
-
-    for &x in reps.iter() {
-        if x != 1 {
-            bail_flag = false;
-        }
-    }
-
-    if bail_flag {
-        let mut res_dim = arr.shape().to_owned();
-
-        _new_shape(num_of_reps, arr.ndim(), &mut res_dim);
-        let res = arr
-            .to_owned()
-            .into_shape(Dim(res_dim))
-            .expect("something went wrong with the tile function during base case");
-
-        return res;
-    }
-    //TODO: this may need to be changed, numpy is avoiding allocations unless
-    //necessary. This may not be possible in rust
-    //see the line: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1246
-    // and SO post: https://stackoverflow.com/a/27609904/11019565
-
-    //to avoid repeatedly casting to IxDyn, and since the input is a 1D array, and the loop takes a 2d array for all ops
-    //the result is going to be stored as a 2d array until it's reshaped at the very last step
-    let mut res: Array2<A> = arr.to_owned().into_shape((1,arr.len())).unwrap();
-    let mut shape_out = res.shape().to_owned();
-    
-    
-    if num_of_reps > res.ndim(){
-        _new_shape(res.ndim(), num_of_reps, &mut shape_out);
-        //res=res.into_shape(shape_out.clone()).unwrap();
-    }
-    
-    //NOTE: need to revisit this section, also if we can determine the type of shape out
-    //we may be able to reduce the two zips to one.
-    //shape_out = tuple(s*t for s, t in zip(c.shape(), tup))
-    _new_shape(num_of_reps,arr.ndim(),&mut reps);
-    
-    azip!((a in &mut shape_out, &b in &reps) *a= *a * b);
-    
-    
-    let mut n = res.len();
-    
-    //used because negative indexing doesn't work
-    let mut first_dim: usize;
-    
-    //the a copy of the input which will be reshaped
-    
-    if n > 0 {
-        //what's going on if reps is larger than shape
-        for (dim_in, &nrep) in zip(&mut res.shape().to_owned(), &reps) {
-            if nrep != 1 {
-                //shape (2,4) should return 4
-                
-                first_dim = res.len()/n;
-                //first_dim = if first_dim>0 {first_dim} else {1};
-                res = res
-                    .into_shape([first_dim, n])
-                    .expect(&format!(
-                        "error reshaping result into shape ( {:?} , {:?} )",
-                        first_dim, n,
-                    ));
-                
-                res = repeat_axis(res.view(),Axis(0), nrep);
-                
-            }
-            n = n / *dim_in;
-        }
-    }
-    
-    //res.into_shape(IxDyn(&shape_out));
-    return res
-        .into_shape(IxDyn(&shape_out))
-        .expect("trouble reshaping output");
-}
 
 //this works for how repeat is called in our project
 pub(crate) fn repeat_axis<A>(arr: ArrayView2<A>, ax:Axis, nrep: usize) -> Array2<A>
@@ -127,16 +29,7 @@ where
     A: Clone + std::fmt::Display + num_traits::Zero,
     
 {
-    
-    let repeat_axis_len = arr.shape()[0] * nrep;
-    let res = ndarray::concatenate(ax, &vec![arr;nrep]).unwrap();
-    // let mut res = ndarray::Array2::<A>::zeros((repeat_axis_len, arr.shape()[1]));
-    // 
-    // let repeated_row=arr.row(0);
-    // //this works for how repeat is called in our project
-    // for mut current_row in res.axis_iter_mut(Axis(0)) {
-    //     current_row.assign(&repeated_row.clone()); 
-    // }
+    let res = ndarray::concatenate(ax, &vec![arr;nrep]).unwrap();   
     res
 }
 
@@ -480,12 +373,7 @@ mod test {
     use ndarray::concatenate;
     use super::*;
 
-    #[test]
-    // fn tile_test() {
-    //     let arr1=array![[0,1,2]];
-    //     assert_eq!(tile(&arr1,vec![2,2]),array![[0,1,2,0,1,2],[0,1,2,0,1,2]].into_dyn());
-    //     assert_eq!(tile(&array![[1,2],[3,4]],vec![2,1]),array![[1,2],[3,4],[1,2],[3,4]].into_dyn());
-    // }
+    
 
     #[test]
     fn tile_equiv_test(){
@@ -504,4 +392,6 @@ mod test {
         let input_arr=array![[1,2,3,4]];
         assert_eq!(repeat_axis(input_arr.view(),Axis(0),2),array![[1,2,3,4],[1,2,3,4]])
     }
+
+    //TODO: add test for pad
 }

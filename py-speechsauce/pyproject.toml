@@ -1,0 +1,10 @@
+[build-system]
+build-backend = "maturin"
+requires = ["maturin>=0.13,<0.14"]
+
+[project]
+name = "speechsauce"
+requires-python = ">=3.7"
+
+[project.dependencies]
+numpy = ["numpy >= 1.16.0"]

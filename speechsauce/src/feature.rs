@@ -7,7 +7,7 @@ use crate::util::ArrayLog;
 
 use ndarray::{
     concatenate, s, Array, Array1, Array2, Array3, ArrayViewMut1, Axis, Dimension,
-    NewAxis,
+    NewAxis, ArrayView1,
 };
 use ndrustfft::{nddct2, DctHandler};
 
@@ -107,7 +107,7 @@ pub fn filterbanks(
 ///     Returns:
 ///         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
 pub fn mfcc(
-    signal: Array1<f64>,
+    signal: ArrayView1<f64>,
     sampling_frequency: usize,
     frame_length: f64,           // =0.020,
     frame_stride: f64,           // =0.01,
@@ -118,7 +118,6 @@ pub fn mfcc(
     high_frequency: Option<f64>, // =None,
     dc_elimination: bool,        //True
 ) -> Array2<f64>
-where
 {   
     
     let (mut feature, energy) = mfe(
@@ -204,9 +203,10 @@ fn _f_it(x: usize) -> Array2<f64> {
 ///         high_frequency : highest band edge of mel filters.
 ///             In Hz, default is samplerate/2
 ///    Returns:
-///              array: features - the energy of fiterbank of size num_frames x num_filters. The energy of each frame: num_frames x 1
+///         array: features - the energy of fiterbank of size num_frames x num_filters.
+///         The energy of each frame: num_frames x 1
 fn mfe(
-    signal: Array1<f64>,
+    signal: ArrayView1<f64>,
     sampling_frequency: usize,
     frame_length: f64,           /*=0.020*/
     frame_stride: f64,           /*=0.01*/
@@ -276,7 +276,7 @@ fn mfe(
 ///    Returns:
 ///         array: Features - The log energy of fiterbank of size num_frames x num_filters frame_log_energies. The log energy of each frame num_frames x 1
 fn lmfe(
-    signal: Array1<f64>,
+    signal: ArrayView1<f64>,
     sampling_frequency: usize,
     frame_length: f64,           /*=0.020*/
     frame_stride: f64,           /*=0.01*/

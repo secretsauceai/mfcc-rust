@@ -17,7 +17,7 @@ Attributes:
 use std::{ops::Mul};
 
 use crate::util::{pad, repeat_axis, PadType};
-use ndarray::{Array1, Array2, Axis, Ix1, Ix2, concatenate, stack};
+use ndarray::{Array1, Array2, Axis, Ix1, Ix2, concatenate, stack, ArrayView1, ArrayView2};
 use ndarray::azip;
 use ndarray::s;
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
@@ -63,7 +63,7 @@ pub fn preemphasis(signal: Array1<f64>, shift: isize /*1*/, cof: f64 /*=0.98*/) 
 /// Returns:
 ///     Stacked_frames-Array of frames of size (number_of_frames x frame_len).
 pub fn stack_frames(
-    sig: Array1<f64>,
+    sig: ArrayView1<f64>,
     sampling_frequency: usize,
     frame_length: f64, /*=0.020*/
     frame_stride: f64, /*=0.020*/
@@ -105,14 +105,14 @@ pub fn stack_frames(
         // new length
         let len_sig =
             ((numframes - 1)  * frame_stride) as usize + frame_sample_length as usize;
-        sig.slice_move(s![0..len_sig])
+        sig.slice(s![0..len_sig]).to_owned()
     };
     let slice_len= numframes * frame_sample_length;
     
     
     let mut frames= Array2::zeros((numframes, frame_sample_length));
     
-    let doubled_sig=stack![Axis(0),signal.view(),signal.view()];
+    let doubled_sig=stack![Axis(0),signal,signal];
     let sig_chunks= doubled_sig.exact_chunks((numframes,2));
     frames.exact_chunks_mut((numframes,2)).into_iter().zip(sig_chunks).for_each(|(mut frame_chunk,sig_chunk)|{
         frame_chunk.assign(&sig_chunk);
@@ -258,7 +258,7 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
 /// variance_normalization (bool): If the variance normalization should be performed or not.
 /// Return:
 ///     array: The mean(or mean+variance) normalized feature vector.
-pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
+pub fn cmvn(vec: ArrayView2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
     let eps = 2.0f64.powf(-30.);
     let rows = vec.shape()[0];
     
@@ -268,7 +268,7 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     let norm_vec = repeat_axis(norm.into_shape((1,norm_len)).unwrap().view(),Axis(0), rows);
     
     // Mean subtraction
-    let mean_subtracted = vec - norm_vec;
+    let mean_subtracted = &vec - norm_vec;
 
     // Variance normalization
     if variance_normalization {
@@ -283,7 +283,7 @@ pub fn cmvn(vec: Array2<f64>, variance_normalization: bool /*=False*/) -> Array2
     } else {
         mean_subtracted
             .into_dimensionality::<Ix2>()
-            .expect("error shaping output of cmvn with variance normalization")
+            .expect("error shaping output of cmvn")
     }
 }
 
