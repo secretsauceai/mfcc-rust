@@ -82,10 +82,7 @@ pub fn filterbanks(
     filterbank
 }
 
-//TODO: verify return type after running, may need to
-//convert to dynamic dimensions (IxDyn) if input varies between
-//1 and 2d output
-// see https://docs.rs/ndarray/latest/ndarray/type.IxDyn.html
+
 
 /// Compute MFCC features from an audio signal.
 ///     Args:
