@@ -85,7 +85,9 @@ mod tests {
 
         let signal=create_signal();
         let mfcc = mfcc(signal.view(),sampling_frequency,frame_length,frame_stride, num_cepstral, num_filters,fft_length,low_frequency,hi_frequency,dc_elination);
-        
+        for &val in mfcc.iter(){
+            assert!(!val.is_nan());
+        }
         assert_eq!(mfcc.shape()[1], num_cepstral);
     }
 }

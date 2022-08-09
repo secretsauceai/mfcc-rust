@@ -27,7 +27,7 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()>{
     ///              be eliminated or not.
     ///     Returns:
     ///         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
-    #[pyfunction]
+    #[pyfn(m)]
     fn mfcc<'py>(
         py: Python<'py>, 
         signal: PyReadonlyArray1<f64>,
@@ -45,7 +45,7 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()>{
     }
     
     //TODO: #14 make signal a mutable borrow (PyReadWriteArray) once the next version of numpy-rust is released
-    #[pyfunction]
+    #[pyfn(m)]
     fn preemphasis<'py>(
         py: Python<'py>, 
         signal: PyReadonlyArray1<f64>, 
@@ -55,7 +55,7 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()>{
         processing::preemphasis(signal.as_array().to_owned(), shift, cof).into_pyarray(py)
     }
 
-    #[pyfunction]
+    #[pyfn(m)]
     fn cmvn<'py>(py: Python<'py>, vec: PyReadonlyArray2<f64>, variance_normalization: bool)-> &'py PyArray2<f64>
     {
         processing::cmvn(vec.as_array(), variance_normalization).into_pyarray(py)

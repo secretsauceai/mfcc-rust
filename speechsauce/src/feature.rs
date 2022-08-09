@@ -38,7 +38,8 @@ pub fn filterbanks(
         "High frequency cannot be greater than half of the sampling frequency!"
     );
     assert!(low_freq >= 0.0, "low frequency cannot be less than zero!");
-
+    
+    
     // Computing the Mel filterbank
     // converting the upper and lower frequencies to Mels.
     // num_filter + 2 is because for num_filter filterbanks we need
@@ -48,7 +49,7 @@ pub fn filterbanks(
         frequency_to_mel(high_freq),
         num_filter + 2,
     );
-
+    
     // we should convert Mels back to Hertz because the start and end-points
     // should be at the desired frequencies.
 
@@ -56,8 +57,9 @@ pub fn filterbanks(
     // exact points calculated above should be extracted.
     //  So we should round those frequencies to the closest FFT bin.
     let freq_index = mel_arr_to_frequency(mels)
-        .map(|x| ((coefficients as i32 + 1) as f64 * x / sampling_freq) as usize);
-
+        .map(|x| ((coefficients  + 1) as f64 * x / sampling_freq) as usize);
+    
+    
     // Initial definition
     let mut filterbank = Array2::zeros([num_filter, coefficients]);
 
@@ -65,20 +67,19 @@ pub fn filterbanks(
     // The triangular function for each filter
     for i in 0..num_filter {
         
-        let left = freq_index[i] as f64;
-        let middle = freq_index[i + 1] as f64;
-        let right = freq_index[i + 2] as f64;
+        let left = freq_index[i];
+        let middle = freq_index[i + 1];
+        let right = freq_index[i + 2];
         
-        let z = Array1::<f64>::linspace(left, right, right as usize - left as usize + 1);
+        let z = Array1::<f64>::linspace(left as f64, right as f64, right - left + 1);
         
         {
             let mut s: ArrayViewMut1<f64> =
-                filterbank.slice_mut(s![i, left as usize..right as usize + 1]);
+                filterbank.slice_mut(s![i, left..right + 1]);
             
-            triangle(&mut s, z, left, middle, right);
+            s.assign(&triangle(z, left as f64, middle as f64, right as f64));
         }
     }
-
     filterbank
 }
 
@@ -130,7 +131,6 @@ pub fn mfcc(
         low_frequency,
         high_frequency,
     );
-    
 
     if feature.len() == 0 {
         return Array::<f64, _>::zeros((0_usize, num_cepstral));
@@ -150,6 +150,7 @@ pub fn mfcc(
 
     //need to switch to rustfft, provide len of last axis specifically
     let mut dct_handler: DctHandler<f64> = DctHandler::new(feature_axis_len);
+    
     //need to check how to specify axis of transformation
     nddct2(&feature, &mut transformed_feature, &mut dct_handler, 1);
     //NOTE: may be able to remove the if/else by processing first element separately
@@ -241,7 +242,7 @@ fn mfe(
     
     // Extracting the filterbank
     let filter_banks = filterbanks(
-        num_filters as usize,
+        num_filters ,
         coefficients,
         sampling_frequency as f64,
         Some(low_frequency),

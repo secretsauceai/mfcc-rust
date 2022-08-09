@@ -1,5 +1,5 @@
 /// contains necessary functions for calculating the features in the `features` module.
-use ndarray::{Array, Array1, ArrayViewMut1, Dimension};
+use ndarray::{Array, Array1, ArrayViewMut1, Dimension, Zip};
 
 
 /// converts a single value representing a frequency in Hz to Mel scale.
@@ -24,24 +24,23 @@ where D: Dimension{
 }
 
 
-pub fn triangle(arr: &mut ArrayViewMut1<f64>, x: Array1<f64>, left: f64, middle: f64, right: f64) {
+pub fn triangle( arr: Array1<f64>, left: f64, middle: f64, right: f64) -> Array1<f64> {
     //original function: https://github.com/astorfi/speechpy/blob/master/speechpy/functions.py#L44
-
-    //arr[x <= left] = 0;
-    //arr[x >= right] = 0;
-    arr.indexed_iter_mut().for_each(|(i, v)| {
-        if (left..right).contains(v) {
+    let mut out=ndarray::Array1::<f64>::zeros(arr.len());
+    Zip::from(&mut out).and(&arr).for_each(|v, x| {
+        if (left..right).contains(x) {
             //TODO: fix range bounds to be exclusive, see https://github.com/rust-lang/rust/issues/37854
-            if *v <= middle {
-                *v = (x[i] - left) / (middle - left);
+            if x <= &middle {
+                *v = (x - left) / (middle - left);
             } //NOTE: depending on whether the double <= >= is intended or not, may be simplified to just else
-            if middle <= *v {
-                *v = (right - x[i]) / (right - middle);
+            if &middle <= x {
+                *v = (right - x) / (right - middle);
             }
         } else {
             *v = 0.0
         }
     });
+    out
 }
 
 ///    This function handle the issue with zero values if the are exposed
