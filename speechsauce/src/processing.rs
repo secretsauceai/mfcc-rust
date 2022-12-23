@@ -17,7 +17,7 @@ Attributes:
 use std::{ops::Mul};
 
 use crate::util::{pad, repeat_axis, PadType};
-use ndarray::{Array1, Array2, Axis, Ix1, Ix2, concatenate, stack, ArrayView1, ArrayView2};
+use ndarray::{Array1, Array2, Axis, Ix1, Ix2, stack, ArrayView1, ArrayView2};
 use ndarray::azip;
 use ndarray::s;
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
@@ -78,8 +78,8 @@ pub fn stack_frames(
     let length_signal = sig.len();
     let frame_sample_length = (sampling_frequency as f64 * frame_length).round() as usize; // Defined by the number of samples
     let frame_stride = ((sampling_frequency as f64 * frame_stride).round()) as usize;
-    let mut len_sig: usize;
-    let mut numframes: usize;
+    let len_sig: usize;
+    let numframes: usize;
 
     //TODO: once the code is working simplify this section, handle sig directly and
     //let the below if else declare the last index
@@ -95,7 +95,7 @@ pub fn stack_frames(
         // Zero padding
         len_sig = (numframes * frame_stride)  + frame_sample_length;
         let additive_zeros =
-            ndarray::Array::<f64, Ix1>::zeros(((len_sig - length_signal) as usize,));
+            ndarray::Array::<f64, Ix1>::zeros(((len_sig - length_signal),));
         ndarray::concatenate![Axis(0), sig, additive_zeros]
     } else {
         // No zero padding! The last frame which does not have enough
@@ -104,10 +104,10 @@ pub fn stack_frames(
 
         // new length
         let len_sig =
-            ((numframes - 1)  * frame_stride) as usize + frame_sample_length as usize;
+            ((numframes - 1)  * frame_stride) + frame_sample_length;
         sig.slice(s![0..len_sig]).to_owned()
     };
-    let slice_len= numframes * frame_sample_length;
+    let _slice_len= numframes * frame_sample_length;
     
     
     let mut frames= Array2::zeros((numframes, frame_sample_length));
@@ -124,7 +124,7 @@ pub fn stack_frames(
         return frames * window;
     }
     
-    return frames;
+    frames
 }
 
 /// This function computes the one-dimensional n-point discrete Fourier
@@ -158,7 +158,7 @@ fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> 
     
     //would this work?
     //spectrum_vector.abs()
-    spectrum_vector.map(|v: &Complex<f64>| -> f64 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() as f64 })
+    spectrum_vector.map(|v: &Complex<f64>| -> f64 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() })
 }
 
 
@@ -191,7 +191,7 @@ fn log_power_spectrum(
     fft_points: usize, /*=512*/
     normalize: bool,   /*=True*/
 ) -> Array2<f64> {
-    let mut mx = 1e-20 as f64; //had to do this because of trait constraints on max
+    let mut mx = 1e-20_f64; //had to do this because of trait constraints on max
     let log_power_spec = power_spectrum(frames, fft_points).map_mut(|x| {
         if *x > 1e-20 {
             *x = 10. * x.log10();
@@ -225,7 +225,7 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
 
     // Pad only along features in the vector.
     let FEAT = pad(
-        &feat,
+        feat,
         vec![[0, 0], [DeltaWindows, DeltaWindows]],
         0.,
         PadType::Edge,
@@ -316,7 +316,7 @@ fn cmvnw(
     assert!(win_size % 2 == 1, "Windows size must be odd!");
 
     // Padding and initial definitions
-    let pad_size = ((win_size - 1) / 2) as usize;
+    let pad_size = (win_size - 1) / 2;
     //NOTE: see https://github.com/rust-ndarray/ndarray/issues/823#issuecomment-942392888
     let vec_pad = pad(
         &vec,

@@ -1,5 +1,5 @@
 /// contains necessary functions for calculating the features in the `features` module.
-use ndarray::{Array, Array1, ArrayViewMut1, Dimension, Zip};
+use ndarray::{Array, Array1, Dimension, Zip};
 
 
 /// converts a single value representing a frequency in Hz to Mel scale.

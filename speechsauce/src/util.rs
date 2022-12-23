@@ -29,8 +29,8 @@ where
     A: Clone + std::fmt::Display + num_traits::Zero,
     
 {
-    let res = ndarray::concatenate(ax, &vec![arr;nrep]).unwrap();   
-    res
+       
+    ndarray::concatenate(ax, &vec![arr;nrep]).unwrap()
 }
 
 //prepends 
@@ -77,8 +77,8 @@ pub(crate) fn pad(
         padded_shape[ax] = ax_len + pre_ax + post_ax;
     }
 
-    let mut padded = Array::from_elem(padded_shape.clone(), const_value);
-    let padded_dim = padded.raw_dim();
+    let mut padded = Array::from_elem(padded_shape, const_value);
+    let _padded_dim = padded.raw_dim();
     {
         // Select portion of padded array that needs to be copied from the
         // original array.
@@ -198,7 +198,7 @@ fn symmetric_pad<A, D>(
                     portion.slice_axis_inplace(Axis(axis), Slice::from(left_b..right_b));
                 }
                 if i > 0 {
-                    portion.assign(&input_array);
+                    portion.assign(input_array);
                 } else {
                     portion.assign(&a_inv);
                 }
@@ -283,7 +283,7 @@ fn edge_pad<A, D>(
                 Slice::from(lo as isize..(padded_shape[axis] - hi) as isize),
             );
         }
-        portion.assign(&input_array);
+        portion.assign(input_array);
 
         let mut portion = padded_array.view_mut();
         input_slice = input_array.view();
@@ -327,7 +327,7 @@ fn set_edge<A, D>(
                 }
                 Some(EdgeRowOp::Bottom) => {
                     input_slice
-                        .slice_axis_inplace(Axis(axis), Slice::from(0 as isize..sub_len + 1_isize));
+                        .slice_axis_inplace(Axis(axis), Slice::from(0_isize..sub_len + 1_isize));
                     padded_array.slice_axis_inplace(
                         Axis(axis),
                         Slice::from(
@@ -352,7 +352,7 @@ fn set_edge<A, D>(
             );
         }
     }
-    padded_array.assign(&input_array);
+    padded_array.assign(input_array);
 }
 
 /// A simple trait to implement log operation for matrixes

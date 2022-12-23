@@ -1,6 +1,6 @@
-use ndarray::Ix1;
+
 use pyo3::prelude::*;
-use numpy::{PyArray,IntoPyArray, PyReadonlyArray1, PyReadonlyArray2, PyArray2, PyArray1};
+use numpy::{IntoPyArray, PyReadonlyArray1, PyReadonlyArray2, PyArray2, PyArray1};
 use speechsauce::{feature,processing};
 
 #[pymodule]

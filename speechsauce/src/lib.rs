@@ -6,11 +6,11 @@ pub mod util;
 
 #[cfg(test)]
 mod tests {
-    use ndarray::{Array, Array1};
+    use ndarray::{Array};
     use ndarray_rand::RandomExt;
     use ndarray_rand::rand_distr::{Normal,Uniform};
     use crate::feature::mfcc;
-    use crate::functions::frequency_to_mel;
+    
     use crate::processing::{cmvn, preemphasis, stack_frames};
 
     
@@ -65,8 +65,8 @@ mod tests {
         //
         //TODO: verify the shape of cvmn and np.zeroes((1,x))
         //should be comparing two 1d arrays in original code
-        assert!(output_mean.abs_diff_eq(&ndarray::Array1::zeros((normalized_feature.shape()[1])),1e-8));
-        assert!(output_std.abs_diff_eq(&ndarray::Array1::ones((normalized_feature.shape()[1])),1e-8));
+        assert!(output_mean.abs_diff_eq(&ndarray::Array1::zeros(normalized_feature.shape()[1]),1e-8));
+        assert!(output_std.abs_diff_eq(&ndarray::Array1::ones(normalized_feature.shape()[1]),1e-8));
     }
 
     #[test]

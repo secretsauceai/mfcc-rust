@@ -132,7 +132,7 @@ pub fn mfcc(
         high_frequency,
     );
 
-    if feature.len() == 0 {
+    if feature.is_empty() {
         return Array::<f64, _>::zeros((0_usize, num_cepstral));
     }
     feature = feature.log();
@@ -178,7 +178,7 @@ pub fn mfcc(
             replace_me.assign(&energy.log())
         }
     }
-    return transformed_feature;
+    transformed_feature
 }
 
 ///a helper function that is passed to stack_frames from mfe
