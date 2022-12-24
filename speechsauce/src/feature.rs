@@ -1,16 +1,14 @@
-
 /// This module provides functions for calculating the main speech
 /// features that the package is aimed to extract as well as the required elements.
-use crate::functions::{frequency_to_mel, triangle, zero_handling, mel_arr_to_frequency};
+use crate::functions::{frequency_to_mel, mel_arr_to_frequency, triangle, zero_handling};
 use crate::processing::stack_frames;
 use crate::util::ArrayLog;
 
 use ndarray::{
-    concatenate, s, Array, Array1, Array2, Array3, ArrayViewMut1, Axis, Dimension,
-    NewAxis, ArrayView1,
+    concatenate, s, Array, Array1, Array2, Array3, ArrayView1, ArrayViewMut1, Axis, Dimension,
+    NewAxis, Slice,
 };
 use ndrustfft::{nddct2, DctHandler};
-
 
 /// Compute the Mel-filterbanks. Each filter will be stored in one rows.
 ///The columns correspond to fft bins.
@@ -38,8 +36,7 @@ pub fn filterbanks(
         "High frequency cannot be greater than half of the sampling frequency!"
     );
     assert!(low_freq >= 0.0, "low frequency cannot be less than zero!");
-    
-    
+
     // Computing the Mel filterbank
     // converting the upper and lower frequencies to Mels.
     // num_filter + 2 is because for num_filter filterbanks we need
@@ -49,7 +46,7 @@ pub fn filterbanks(
         frequency_to_mel(high_freq),
         num_filter + 2,
     );
-    
+
     // we should convert Mels back to Hertz because the start and end-points
     // should be at the desired frequencies.
 
@@ -57,33 +54,27 @@ pub fn filterbanks(
     // exact points calculated above should be extracted.
     //  So we should round those frequencies to the closest FFT bin.
     let freq_index = mel_arr_to_frequency(mels)
-        .map(|x| ((coefficients  + 1) as f64 * x / sampling_freq) as usize);
-    
-    
+        .map(|x| ((coefficients + 1) as f64 * x / sampling_freq) as usize);
+
     // Initial definition
     let mut filterbank = Array2::zeros([num_filter, coefficients]);
 
-    
     // The triangular function for each filter
     for i in 0..num_filter {
-        
         let left = freq_index[i];
         let middle = freq_index[i + 1];
         let right = freq_index[i + 2];
-        
+
         let z = Array1::<f64>::linspace(left as f64, right as f64, right - left + 1);
-        
+
         {
-            let mut s: ArrayViewMut1<f64> =
-                filterbank.slice_mut(s![i, left..right + 1]);
-            
+            let mut s: ArrayViewMut1<f64> = filterbank.slice_mut(s![i, left..right + 1]);
+
             s.assign(&triangle(z, left as f64, middle as f64, right as f64));
         }
     }
     filterbank
 }
-
-
 
 /// Compute MFCC features from an audio signal.
 ///     Args:
@@ -91,7 +82,7 @@ pub fn filterbanks(
 ///              Should be an N x 1 array
 ///          sampling_frequency : the sampling frequency of the signal
 ///              we are working with.
-///          frame_length : the length of each frame in seconds.
+///          frame_length :
 ///              Default is 0.020s
 ///          frame_stride : the step between successive frames in seconds.
 ///              Default is 0.02s (means no overlap)
@@ -102,8 +93,8 @@ pub fn filterbanks(
 ///              In Hz, default is 0.
 ///          high_frequency (float): highest band edge of mel filters.
 ///              In Hz, default is samplerate/2
-///          num_cepstral (int): Number of cepstral coefficients.
-///          dc_elimination (bool): hIf the first dc component should
+///          num_cepstral : Number of cepstral coefficients.
+///          dc_elimination : If the first dc component should
 ///              be eliminated or not.
 ///     Returns:
 ///         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
@@ -111,16 +102,14 @@ pub fn mfcc(
     signal: ArrayView1<f64>,
     sampling_frequency: usize,
     frame_length: f64,           // =0.020,
-    frame_stride: f64,           // =0.01,
+    frame_stride: f64,           // =0.02,
     num_cepstral: usize,         // =13,
     num_filters: usize,          // =40,
     fft_length: usize,           // =512,
     low_frequency: f64,          // =0,
     high_frequency: Option<f64>, // =None,
     dc_elimination: bool,        //True
-) -> Array2<f64>
-{   
-    
+) -> Array2<f64> {
     let (mut feature, energy) = mfe(
         signal,
         sampling_frequency,
@@ -136,6 +125,7 @@ pub fn mfcc(
         return Array::<f64, _>::zeros((0_usize, num_cepstral));
     }
     feature = feature.log();
+    //feature second axis equal to num_filters
     let feature_axis_len = feature.shape()[1];
     let mut transformed_feature = Array2::<f64>::zeros(feature.raw_dim());
     //link to og code:
@@ -150,22 +140,20 @@ pub fn mfcc(
 
     //need to switch to rustfft, provide len of last axis specifically
     let mut dct_handler: DctHandler<f64> = DctHandler::new(feature_axis_len);
-    
+
     //need to check how to specify axis of transformation
     nddct2(&feature, &mut transformed_feature, &mut dct_handler, 1);
     //NOTE: may be able to remove the if/else by processing first element separately
     //https://docs.scipy.org/doc/scipy/reference/generated/scipy.fftpack.dct.html#:~:text=2N)-,If%20norm%3D%27ortho%27%2C%20y%5Bk%5D%20is%20multiplied%20by%20a%20scaling%20factor%20f,-f%3D%7B
     let n = transformed_feature.len() as f64;
-    transformed_feature.map_mut(|x| {
-        *x = if *x == 0. {
-            *x * (1. / (4. * n).sqrt())
-        } else {
-            *x * (1. / (2. * n).sqrt())
-        }
-    });
-    
+    //orthonormalized the transformed axis
+    transformed_feature[[0, 0]] *= 1. / (4. * n).sqrt();
+    transformed_feature
+        .slice_axis_mut(Axis(1), Slice::new(1, None, 1))
+        .mapv_inplace(|x| x * (1. / (2. * n).sqrt()));
+
     transformed_feature = transformed_feature.slice_move(s![.., ..num_cepstral]);
-    
+
     // replace first cepstral coefficient with log of frame energy for DC
     // elimination.
     if dc_elimination {
@@ -183,7 +171,7 @@ pub fn mfcc(
 
 ///a helper function that is passed to stack_frames from mfe
 fn _f_it(x: usize) -> Array2<f64> {
-    Array2::<f64>::ones((x,1))
+    Array2::<f64>::ones((x, 1))
 }
 
 /// Compute Mel-filterbank energy features from an audio signal.
@@ -216,7 +204,6 @@ fn mfe(
     low_frequency: f64,          /*=0*/
     high_frequency: Option<f64>, /*None*/
 ) -> (Array2<f64>, Array1<f64>) {
-    
     //
     // Stack frames
     let frames = stack_frames(
@@ -225,37 +212,36 @@ fn mfe(
         frame_length,
         frame_stride,
         None,
-        false, 
+        false,
     );
-    
+
     // getting the high frequency
     let high_frequency = high_frequency.unwrap_or(sampling_frequency as f64 / 2.);
-    
+
     // calculation of the power spectrum
     let power_spectrum = crate::processing::power_spectrum(frames, fft_length);
     let coefficients = power_spectrum.shape()[1];
     // this stores the total energy in each frame
     let frame_energies = power_spectrum.sum_axis(Axis(1));
-    
+
     // Handling zero energies.
     let frame_energies = zero_handling(frame_energies);
-    
+
     // Extracting the filterbank
     let filter_banks = filterbanks(
-        num_filters ,
+        num_filters,
         coefficients,
         sampling_frequency as f64,
         Some(low_frequency),
         Some(high_frequency),
     );
-    
+
     // Filterbank energies
     let features = power_spectrum.dot(&filter_banks.reversed_axes());
     let features = crate::functions::zero_handling(features);
 
     (features, frame_energies)
 }
-
 
 /// Compute log Mel-filterbank energy features from an audio signal.
 ///    Args:
@@ -299,7 +285,6 @@ fn lmfe(
     feature.log()
 }
 
-
 /// extracts temporal derivative features which are first and second derivatives.
 /// uses the derivative extraction function from the processing module
 /// Args:
@@ -323,4 +308,3 @@ fn extract_derivative_feature(feature: Array2<f64>) -> Array3<f64> {
 
     feature_cube
 }
-
