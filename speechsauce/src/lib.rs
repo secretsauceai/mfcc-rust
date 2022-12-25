@@ -1,5 +1,5 @@
 #![recursion_limit = "512"]
-pub mod builder;
+pub mod config;
 pub mod feature;
 pub mod functions;
 pub mod processing;

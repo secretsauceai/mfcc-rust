@@ -1,7 +1,10 @@
+use ndarray::Array2;
 use ndrustfft::{DctHandler, R2cFftHandler};
 
+use crate::feature::filterbanks;
+
 #[derive(Default)]
-pub struct MfccBuilder {
+pub struct MfccConfigBuilder {
     ///sampling frequency of the signal
     sample_rate: usize,
     /// number of FFT points.
@@ -22,9 +25,9 @@ pub struct MfccBuilder {
     dc_elimination: bool,
 }
 
-impl MfccBuilder {
-    fn new(sample_rate: usize) -> MfccBuilder {
-        MfccBuilder {
+impl MfccConfigBuilder {
+    fn new(sample_rate: usize) -> MfccConfigBuilder {
+        MfccConfigBuilder {
             sample_rate,
             fft_points: 512,
             frame_length: 0.02,
@@ -37,43 +40,43 @@ impl MfccBuilder {
         }
     }
 
-    pub fn high_freq(mut self, high_frequency: f64) -> MfccBuilder {
+    pub fn high_freq(mut self, high_frequency: f64) -> MfccConfigBuilder {
         self.high_frequency = high_frequency;
         self
     }
 
-    pub fn dc_elimination(mut self, dc_elimination: bool) -> MfccBuilder {
+    pub fn dc_elimination(mut self, dc_elimination: bool) -> MfccConfigBuilder {
         self.dc_elimination = dc_elimination;
         self
     }
 
-    pub fn low_freq(mut self, low_frequency: f64) -> MfccBuilder {
+    pub fn low_freq(mut self, low_frequency: f64) -> MfccConfigBuilder {
         self.low_frequency = low_frequency;
         self
     }
 
-    pub fn num_cepstral(mut self, num_cepstral: usize) -> MfccBuilder {
+    pub fn num_cepstral(mut self, num_cepstral: usize) -> MfccConfigBuilder {
         self.num_cepstral = num_cepstral;
         self
     }
 
-    pub fn frame_stride(mut self, frame_stride: f64) -> MfccBuilder {
+    pub fn frame_stride(mut self, frame_stride: f64) -> MfccConfigBuilder {
         self.frame_stride = frame_stride;
         self
     }
 
-    pub fn frame_length(mut self, frame_length: f64) -> MfccBuilder {
+    pub fn frame_length(mut self, frame_length: f64) -> MfccConfigBuilder {
         self.frame_length = frame_length;
         self
     }
 
-    pub fn fft_points(mut self, fft_points: usize) -> MfccBuilder {
+    pub fn fft_points(mut self, fft_points: usize) -> MfccConfigBuilder {
         self.fft_points = fft_points;
         self
     }
 
-    pub fn build(self) -> Mfcc {
-        Mfcc::new(
+    pub fn build(self) -> MfccConfig {
+        MfccConfig::new(
             self.sample_rate,
             self.fft_points,
             self.frame_length,
@@ -87,9 +90,7 @@ impl MfccBuilder {
     }
 }
 
-pub struct Mfcc {
-    dct_handler: DctHandler<f64>,
-    fft_handler: R2cFftHandler<f64>,
+pub struct MfccConfig {
     ///sampling frequency of the signal
     sample_rate: usize,
     /// number of FFT points.
@@ -108,9 +109,14 @@ pub struct Mfcc {
     high_frequency: f64,
     /// If the first dc component should be eliminated or not
     dc_elimination: bool,
+    ///for
+    dct_handler: DctHandler<f64>,
+    fft_handler: R2cFftHandler<f64>,
+    /// Mel-filterbanks
+    filter_banks: Array2<f64>,
 }
 
-impl Mfcc {
+impl MfccConfig {
     pub fn new(
         sample_rate: usize,
         fft_points: usize,
@@ -134,10 +140,17 @@ impl Mfcc {
             low_frequency,
             high_frequency,
             dc_elimination,
+            filter_banks: filterbanks(
+                num_filters,
+                (fft_points / 2) + 1,
+                sample_rate as f64,
+                Some(low_frequency),
+                Some(high_frequency),
+            ),
         }
     }
 
-    pub fn builder() -> MfccBuilder {
-        MfccBuilder::default()
+    pub fn builder() -> MfccConfigBuilder {
+        MfccConfigBuilder::default()
     }
 }

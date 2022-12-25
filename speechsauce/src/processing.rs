@@ -219,7 +219,7 @@ fn log_power_spectrum(
 ///     DeltaWindows : The value of  DeltaWindows is set using the configuration parameter DELTAWINDOW.
 /// Returns:
 ///     A NUMFRAMESxNUMFEATURES array which is the derivative features along the features.
-pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<f64> {
+pub fn derivative_extraction(feat: &Array2<f64>, delta_windows: usize) -> Array2<f64> {
     // Getting the shape of the vector.
     let cols = feat.shape()[1];
 
@@ -230,13 +230,13 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
     // Pad only along features in the vector.
     let features = pad(
         feat,
-        vec![[0, 0], [DeltaWindows, DeltaWindows]],
+        vec![[0, 0], [delta_windows, delta_windows]],
         0.,
         PadType::Edge,
     );
-    for i in 0..DeltaWindows {
+    for i in 0..delta_windows {
         // Start index
-        let offset = DeltaWindows;
+        let offset = delta_windows;
 
         // The dynamic range
         let Range = i + 1;

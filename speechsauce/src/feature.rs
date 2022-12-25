@@ -22,13 +22,13 @@ use ndrustfft::{nddct2, DctHandler};
 /// Returns:
 ///         array: A numpy array of size num_filter x (fftpoints//2 + 1)
 ///             which are filterbank
-pub fn filterbanks(
+pub(crate) fn filterbanks(
     num_filter: usize,
     coefficients: usize,
     sampling_freq: f64,
     low_freq: Option<f64>,
     high_freq: Option<f64>,
-) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
+) -> Array2<f64> {
     let high_freq = high_freq.unwrap_or(sampling_freq / 2.0);
     let low_freq = low_freq.unwrap_or(300.0);
     assert!(
