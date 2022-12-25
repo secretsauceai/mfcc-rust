@@ -97,7 +97,7 @@ pub fn filterbanks(
 ///          dc_elimination : If the first dc component should
 ///              be eliminated or not.
 ///     Returns:
-///         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
+///         array: An array of size (num_frames x num_cepstral) containing mfcc features.
 pub fn mfcc(
     signal: ArrayView1<f64>,
     sampling_frequency: usize,
@@ -194,7 +194,7 @@ fn _f_it(x: usize) -> Array2<f64> {
 ///    Returns:
 ///         array: features - the energy of fiterbank of size num_frames x num_filters.
 ///         The energy of each frame: num_frames x 1
-fn mfe(
+pub fn mfe(
     signal: ArrayView1<f64>,
     sampling_frequency: usize,
     frame_length: f64,           /*=0.020*/

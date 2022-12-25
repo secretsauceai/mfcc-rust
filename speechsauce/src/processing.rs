@@ -13,15 +13,13 @@ Attributes:
     cmvnw: Cepstral mean variance normalization over the sliding window. This is a post processing operation.
 */
 
-
-use std::{ops::Mul};
+use std::ops::Mul;
 
 use crate::util::{pad, repeat_axis, PadType};
-use ndarray::{Array1, Array2, Axis, Ix1, Ix2, stack, ArrayView1, ArrayView2};
 use ndarray::azip;
 use ndarray::s;
+use ndarray::{stack, Array1, Array2, ArrayView1, ArrayView2, Axis, Ix1, Ix2};
 use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
-
 
 /// preemphasising on the signal.
 /// Args:
@@ -30,32 +28,34 @@ use ndrustfft::{ndfft_r2c, Complex, R2cFftHandler};
 ///     cof (float): The preemphasising coefficient. 0 equals to no filtering.
 /// Returns:
 ///     The pre-emphasized signal.
-pub fn preemphasis(signal: Array1<f64>, shift: isize /*1*/, cof: f64 /*=0.98*/) -> Array1<f64> {
+pub fn preemphasis(
+    signal: Array1<f64>,
+    shift: isize, /*1*/
+    cof: f64,     /*=0.98*/
+) -> Array1<f64> {
     //Note: https://github.com/rust-ndarray/ndarray/issues/281
     //lets use an example of a signal with 5 elements and a shift of 2
     let mut rolled_signal = Array1::<f64>::zeros(signal.shape()[0]);
     //the original array will be divided into two chunks
-    {   
+    {
         //first assign the right chunk of the result from the left chunk of the input
         // in the example 0,1,2,3
-        let mut rolled_slice=rolled_signal.slice_mut(s![..shift]);
+        let mut rolled_slice = rolled_signal.slice_mut(s![..shift]);
         rolled_slice.assign(&signal.slice(s![-shift..]));
     }
     {
         //second assign the left chunk of the result for the right chunk of the input
         //in the example 4,5
-        let mut rolled_slice=rolled_signal.slice_mut(s![shift..]);
+        let mut rolled_slice = rolled_signal.slice_mut(s![shift..]);
         rolled_slice.assign(&signal.slice(s![..-shift]));
-        
     }
     signal - (cof * rolled_signal)
 }
 
-
 /// Frame a signal into overlapping frames.
 /// Args:
-///     sig (array): The audio signal to frame of size (N,).
-///     sampling_frequency (int): The sampling frequency of the signal.
+///     signal : The audio signal to frame of size (N,).
+///     sample rate (int): The sampling frequency of the signal.
 ///     frame_length (float): The length of the frame in second.
 ///     frame_stride (float): The stride between frames.
 ///     filter (array): The time-domain filter for applying to each frame. By default it is one so nothing will be changed.
@@ -63,8 +63,8 @@ pub fn preemphasis(signal: Array1<f64>, shift: isize /*1*/, cof: f64 /*=0.98*/) 
 /// Returns:
 ///     Stacked_frames-Array of frames of size (number_of_frames x frame_len).
 pub fn stack_frames(
-    sig: ArrayView1<f64>,
-    sampling_frequency: usize,
+    signal: ArrayView1<f64>,
+    sample_rate: usize,
     frame_length: f64, /*=0.020*/
     frame_stride: f64, /*=0.020*/
     filter: Option<fn(usize) -> Array2<f64>>, /*=lambda x: np.ones(
@@ -72,12 +72,10 @@ pub fn stack_frames(
                         ))*/
     zero_padding: bool, /*=True*/
 ) -> Array2<f64> {
-    
-
     // Initial necessary values
-    let length_signal = sig.len();
-    let frame_sample_length = (sampling_frequency as f64 * frame_length).round() as usize; // Defined by the number of samples
-    let frame_stride = ((sampling_frequency as f64 * frame_stride).round()) as usize;
+    let length_signal = signal.len();
+    let frame_sample_length = (sample_rate as f64 * frame_length).round() as usize; // Defined by the number of samples
+    let frame_step_size = ((sample_rate as f64 * frame_stride).round()) as usize;
     let len_sig: usize;
     let numframes: usize;
 
@@ -90,40 +88,43 @@ pub fn stack_frames(
         // TODO: check why the suggested edit (for including the last frame length) in issue below causes error
         // https://github.com/astorfi/speechpy/issues/34
         // see if implementation needs to change to address it
-        numframes = ((length_signal - (frame_sample_length )) as f64 / frame_stride as f64).ceil() as usize;
-        
+        numframes = ((length_signal - (frame_sample_length)) as f64 / frame_step_size as f64).ceil()
+            as usize;
+
         // Zero padding
-        len_sig = (numframes * frame_stride)  + frame_sample_length;
-        let additive_zeros =
-            ndarray::Array::<f64, Ix1>::zeros(((len_sig - length_signal),));
-        ndarray::concatenate![Axis(0), sig, additive_zeros]
+        len_sig = (numframes * frame_step_size) + frame_sample_length;
+        let additive_zeros = ndarray::Array::<f64, Ix1>::zeros(((len_sig - length_signal),));
+        ndarray::concatenate![Axis(0), signal, additive_zeros]
     } else {
         // No zero padding! The last frame which does not have enough
         // samples(remaining samples <= frame_sample_length), will be dropped!
-        numframes = ((length_signal - frame_sample_length) as f64 / frame_stride as f64).floor() as usize;
+        numframes = ((length_signal - frame_sample_length) as f64 / frame_step_size as f64).floor()
+            as usize;
 
         // new length
-        let len_sig =
-            ((numframes - 1)  * frame_stride) + frame_sample_length;
-        sig.slice(s![0..len_sig]).to_owned()
+        let len_sig = ((numframes - 1) * frame_step_size) + frame_sample_length;
+        signal.slice(s![0..len_sig]).to_owned()
     };
-    let _slice_len= numframes * frame_sample_length;
-    
-    
-    let mut frames= Array2::zeros((numframes, frame_sample_length));
-    
-    let doubled_sig=stack![Axis(0),signal,signal];
-    let sig_chunks= doubled_sig.exact_chunks((numframes,2));
-    frames.exact_chunks_mut((numframes,2)).into_iter().zip(sig_chunks).for_each(|(mut frame_chunk,sig_chunk)|{
-        frame_chunk.assign(&sig_chunk);
-    });
-    
-    if let Some(f) = filter{
-        let filt=f(frame_sample_length);
-    let window = repeat_axis(filt.view(), Axis(0), numframes);    
+    let _slice_len = numframes * frame_sample_length;
+
+    let mut frames = Array2::zeros((numframes, frame_sample_length));
+
+    let doubled_sig = stack![Axis(0), signal, signal];
+    let sig_chunks = doubled_sig.exact_chunks((numframes, 2));
+    frames
+        .exact_chunks_mut((numframes, 2))
+        .into_iter()
+        .zip(sig_chunks)
+        .for_each(|(mut frame_chunk, sig_chunk)| {
+            frame_chunk.assign(&sig_chunk);
+        });
+
+    if let Some(f) = filter {
+        let filt = f(frame_sample_length);
+        let window = repeat_axis(filt.view(), Axis(0), numframes);
         return frames * window;
     }
-    
+
     frames
 }
 
@@ -140,27 +141,32 @@ pub fn stack_frames(
 /// If frames is an num_frames x sample_per_frame matrix, output
 /// will be num_frames x FFT_LENGTH.
 fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
-    
     let row_size = frames.shape()[0];
     let col_size = frames.shape()[1];
     let mut handler = R2cFftHandler::<f64>::new(fft_points);
     let frames = if col_size < fft_points {
-        pad(&frames, vec![[0,0],[0, fft_points-col_size]], 0., PadType::Constant)  }
-        else{ frames };
+        pad(
+            &frames,
+            vec![[0, 0], [0, fft_points - col_size]],
+            0.,
+            PadType::Constant,
+        )
+    } else {
+        frames
+    };
     let mut spectrum_vector = Array2::<Complex<f64>>::zeros((row_size, fft_points / 2 + 1));
-    
+
     ndfft_r2c(
         &frames.view(),
         &mut spectrum_vector.view_mut(),
         &mut handler,
-        1
+        1,
     );
-    
+
     //would this work?
     //spectrum_vector.abs()
     spectrum_vector.map(|v: &Complex<f64>| -> f64 { (v.re.powf(2.) + v.im.powf(2.)).sqrt() })
 }
-
 
 /// Power spectrum of each frame.
 /// Args:
@@ -173,7 +179,6 @@ fn fft_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> 
 pub fn power_spectrum(frames: Array2<f64>, fft_points: usize /*=512*/) -> Array2<f64> {
     fft_spectrum(frames, fft_points).map(|x| (1. / fft_points as f64) * *x)
 }
-
 
 /// Log power spectrum of each frame in frames.
 /// Args:
@@ -208,7 +213,6 @@ fn log_power_spectrum(
     }
 }
 
-
 /// This function extracts the derivative features.
 /// Args:
 ///     feat : The main feature vector(For returning the second order derivative it can be first-order derivative).
@@ -220,11 +224,11 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
     let cols = feat.shape()[1];
 
     // Difining the vector of differences.
-    let mut DIF = Array2::<f64>::zeros(feat.raw_dim());
-    let mut Scale = 0.;
+    let mut difference_vector = Array2::<f64>::zeros(feat.raw_dim());
+    let mut scale = 0.;
 
     // Pad only along features in the vector.
-    let FEAT = pad(
+    let features = pad(
         feat,
         vec![[0, 0], [DeltaWindows, DeltaWindows]],
         0.,
@@ -237,16 +241,16 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
         // The dynamic range
         let Range = i + 1;
 
-        let dif = FEAT
+        let dif = features
             .slice(s![.., offset + Range..offset + Range + cols])
             .mul(Range as f64)
-            - FEAT.slice(s![.., offset - Range..offset - Range + cols]);
+            - features.slice(s![.., offset - Range..offset - Range + cols]);
 
-        Scale += 2. * (Range as f64).powf(2.);
-        DIF = DIF + dif;
+        scale += 2. * (Range as f64).powf(2.);
+        difference_vector = difference_vector + dif;
     }
 
-    DIF / Scale
+    difference_vector / scale
 }
 
 /// This function is aimed to perform global cepstral mean and
@@ -261,22 +265,30 @@ pub fn derivative_extraction(feat: &Array2<f64>, DeltaWindows: usize) -> Array2<
 pub fn cmvn(vec: ArrayView2<f64>, variance_normalization: bool /*=False*/) -> Array2<f64> {
     let eps = 2.0f64.powf(-30.);
     let rows = vec.shape()[0];
-    
+
     // Mean calculation
     let norm = vec.mean_axis(Axis(0)).unwrap();
-    let norm_len=norm.len();
-    let norm_vec = repeat_axis(norm.into_shape((1,norm_len)).unwrap().view(),Axis(0), rows);
-    
+    let norm_len = norm.len();
+    let norm_vec = repeat_axis(
+        norm.into_shape((1, norm_len)).unwrap().view(),
+        Axis(0),
+        rows,
+    );
+
     // Mean subtraction
     let mean_subtracted = &vec - norm_vec;
 
     // Variance normalization
     if variance_normalization {
         let stdev = mean_subtracted.std_axis(Axis(0), 0.);
-        let stdev_len=stdev.len();
-        
-        let stdev_vec = repeat_axis(stdev.into_shape((1,stdev_len)).unwrap().view(), Axis(0),rows);
-        
+        let stdev_len = stdev.len();
+
+        let stdev_vec = repeat_axis(
+            stdev.into_shape((1, stdev_len)).unwrap().view(),
+            Axis(0),
+            rows,
+        );
+
         (mean_subtracted / (stdev_vec + eps))
             .into_dimensionality::<Ix2>()
             .expect("error shaping output of cmvn with variance normalization")
@@ -287,9 +299,8 @@ pub fn cmvn(vec: ArrayView2<f64>, variance_normalization: bool /*=False*/) -> Ar
     }
 }
 
-
 /// This function is aimed to perform local cepstral mean and
-/// variance normalization on a sliding window. 
+/// variance normalization on a sliding window.
 /// The code assumes that there is one observation per row.
 /// Args:
 ///     vec : input feature matrix
@@ -301,7 +312,7 @@ pub fn cmvn(vec: ArrayView2<f64>, variance_normalization: bool /*=False*/) -> Ar
 ///         be performed or not.
 /// Return:
 ///         array: The mean(or mean+variance) normalized feature vector.
-fn cmvnw(
+pub fn cmvnw(
     vec: Array2<f64>,
     win_size: usize,              /*=301*/
     variance_normalization: bool, /*=False*/

@@ -23,7 +23,7 @@ pub struct MfccBuilder {
 }
 
 impl MfccBuilder {
-    fn new(sampling_frequency: usize) -> MfccBuilder {
+    fn new(sample_rate: usize) -> MfccBuilder {
         MfccBuilder {
             sample_rate,
             fft_points: 512,
@@ -33,7 +33,7 @@ impl MfccBuilder {
             num_filters: 40,
             low_frequency: 0.0,
             high_frequency: sample_rate as f64 / 2.0,
-            dc_elimination: True,
+            dc_elimination: true,
         }
     }
 
@@ -138,6 +138,6 @@ impl Mfcc {
     }
 
     pub fn builder() -> MfccBuilder {
-        MfccBuiler::default()
+        MfccBuilder::default()
     }
 }
