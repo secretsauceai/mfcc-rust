@@ -1,4 +1,4 @@
-use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, ToPyArray};
 use pyo3::prelude::*;
 use speechsauce::{config::SpeechConfig, feature, processing};
 #[pyclass]
@@ -38,7 +38,8 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         signal: PyReadonlyArray1<f64>,
         config: PySpeechConfig,
     ) -> &'py PyArray2<f64> {
-        feature::mfcc(signal.as_array(), config.speech_config)
+        let PySpeechConfig { speech_config } = config;
+        feature::mfcc(signal.as_array(), &speech_config).to_pyarray(py)
     }
 
     //TODO: #14 make signal a mutable borrow (PyReadWriteArray) once the next version of numpy-rust is released
@@ -73,7 +74,7 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         high_frequency: Option<f64>, // =None,
         dc_elimination: bool,        //True
     ) -> &'py PySpeechConfig {
-        PySpeechConfig {
+        &'py PySpeechConfig {
             speech_config: SpeechConfig::new(
                 sampling_frequency,
                 fft_length,
@@ -82,7 +83,7 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
                 num_cepstral,
                 num_filters,
                 low_frequency,
-                high_frequency,
+                high_frequency.unwrap_or(sampling_frequency as f64 / 2.0),
                 dc_elimination,
             ),
         }
