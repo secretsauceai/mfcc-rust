@@ -7,6 +7,7 @@ pub mod util;
 
 #[cfg(test)]
 mod tests {
+    use crate::config::{SpeechConfig, SpeechConfigBuilder};
     use crate::feature::{mfcc, mfe};
     use ndarray::Array;
     use ndarray_rand::rand_distr::{Normal, Uniform};
@@ -24,6 +25,9 @@ mod tests {
         16000
     }
 
+    fn default_config(sample_rate: usize) -> SpeechConfig {
+        SpeechConfigBuilder::new(sample_rate).build()
+    }
     fn get_num_frames(
         signal_len: usize,
         sample_rate: usize,
@@ -87,32 +91,19 @@ mod tests {
         let num_cepstral: usize = 13;
 
         let sampling_frequency = 16000;
-        let frame_length = 0.02;
-        let frame_stride = 0.01;
-        let num_filters = 40;
-        let fft_length = 512;
-        let low_frequency = 0.;
-        let hi_frequency = None;
-        let dc_elimination = true;
 
         let signal = create_signal();
-        let mfcc = mfcc(
-            signal.view(),
-            sampling_frequency,
-            frame_length,
-            frame_stride,
-            num_cepstral,
-            num_filters,
-            fft_length,
-            low_frequency,
-            hi_frequency,
-            dc_elimination,
-        );
+        let speech_config = default_config(sampling_frequency);
+        let mfcc = mfcc(signal.view(), &speech_config);
         for &val in mfcc.iter() {
             assert!(!val.is_nan());
         }
-        let num_frames =
-            get_num_frames(signal.len(), sampling_frequency, frame_length, frame_stride);
+        let num_frames = get_num_frames(
+            signal.len(),
+            sampling_frequency,
+            speech_config.frame_length,
+            speech_config.frame_stride,
+        );
 
         assert_eq!(mfcc.shape()[0], num_frames);
         assert_eq!(mfcc.shape()[1], num_cepstral);
@@ -120,31 +111,21 @@ mod tests {
     #[test]
     fn test_mfe() {
         let sampling_frequency = 16000;
-        let frame_length = 0.02;
-        let frame_stride = 0.01;
-        let num_filters = 40;
-        let fft_length = 512;
-        let low_frequency = 0.;
-        let hi_frequency = None;
 
         let signal = create_signal();
-        let (features, frame_energies) = mfe(
-            signal.view(),
-            sampling_frequency,
-            frame_length,
-            frame_stride,
-            num_filters,
-            fft_length,
-            low_frequency,
-            hi_frequency,
-        );
+        let speech_config = default_config(sampling_frequency);
+        let (features, frame_energies) = mfe(signal.view(), &speech_config);
         //supposed number of frames (I think)
-        let num_frames =
-            get_num_frames(signal.len(), sampling_frequency, frame_length, frame_stride);
+        let num_frames = get_num_frames(
+            signal.len(),
+            sampling_frequency,
+            speech_config.frame_length,
+            speech_config.frame_stride,
+        );
 
         //test shape of outputs
         assert!(features.shape()[0] == num_frames);
-        assert!(features.shape()[1] == num_filters);
+        assert!(features.shape()[1] == speech_config.num_filters);
         assert!(frame_energies.shape()[0] == num_frames);
     }
 }

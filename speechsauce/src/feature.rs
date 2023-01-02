@@ -1,3 +1,4 @@
+use crate::config::SpeechConfig;
 /// This module provides functions for calculating the main speech
 /// features that the package is aimed to extract as well as the required elements.
 use crate::functions::{frequency_to_mel, mel_arr_to_frequency, triangle, zero_handling};
@@ -5,8 +6,8 @@ use crate::processing::stack_frames;
 use crate::util::ArrayLog;
 
 use ndarray::{
-    concatenate, s, Array, Array1, Array2, Array3, ArrayView1, ArrayViewMut1, Axis, Dimension,
-    NewAxis, Slice,
+    concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayView1, ArrayViewMut1, Axis, Dim,
+    Dimension, Ix2, NewAxis, Slice,
 };
 use ndrustfft::{nddct2, DctHandler};
 
@@ -80,49 +81,11 @@ pub(crate) fn filterbanks(
 ///     Args:
 ///          signal : the audio signal from which to compute features.
 ///              Should be an N x 1 array
-///          sampling_frequency : the sampling frequency of the signal
-///              we are working with.
-///          frame_length :
-///              Default is 0.020s
-///          frame_stride : the step between successive frames in seconds.
-///              Default is 0.02s (means no overlap)
-///          num_filters : the number of filters in the filterbank,
-///              default 40.
-///          fft_length : number of FFT points. Default is 512.
-///          low_frequency : lowest band edge of mel filters.
-///              In Hz, default is 0.
-///          high_frequency (float): highest band edge of mel filters.
-///              In Hz, default is samplerate/2
-///          num_cepstral : Number of cepstral coefficients.
-///          dc_elimination : If the first dc component should
-///              be eliminated or not.
-///     Returns:
-///         array: An array of size (num_frames x num_cepstral) containing mfcc features.
-pub fn mfcc(
-    signal: ArrayView1<f64>,
-    sampling_frequency: usize,
-    frame_length: f64,           // =0.020,
-    frame_stride: f64,           // =0.02,
-    num_cepstral: usize,         // =13,
-    num_filters: usize,          // =40,
-    fft_length: usize,           // =512,
-    low_frequency: f64,          // =0,
-    high_frequency: Option<f64>, // =None,
-    dc_elimination: bool,        //True
-) -> Array2<f64> {
-    let (mut feature, energy) = mfe(
-        signal,
-        sampling_frequency,
-        frame_length,
-        frame_stride,
-        num_filters,
-        fft_length,
-        low_frequency,
-        high_frequency,
-    );
+pub fn mfcc(signal: ArrayView1<f64>, speech_config: &SpeechConfig) -> Array2<f64> {
+    let (mut feature, energy) = mfe(signal, &speech_config);
 
     if feature.is_empty() {
-        return Array::<f64, _>::zeros((0_usize, num_cepstral));
+        return Array::<f64, _>::zeros((0_usize, speech_config.num_cepstral));
     }
     feature = feature.log();
     //feature second axis equal to num_filters
@@ -152,11 +115,11 @@ pub fn mfcc(
         .slice_axis_mut(Axis(1), Slice::new(1, None, 1))
         .mapv_inplace(|x| x * (1. / (2. * n).sqrt()));
 
-    transformed_feature = transformed_feature.slice_move(s![.., ..num_cepstral]);
+    transformed_feature = transformed_feature.slice_move(s![.., ..speech_config.num_cepstral]);
 
     // replace first cepstral coefficient with log of frame energy for DC
     // elimination.
-    if dc_elimination {
+    if speech_config.dc_elimination {
         //>>>x = np.array([[1,2,3,4],[5,6,7,8]])
         //>>>x[:,0]
         //array([1, 5])
@@ -194,50 +157,29 @@ fn _f_it(x: usize) -> Array2<f64> {
 ///    Returns:
 ///         array: features - the energy of fiterbank of size num_frames x num_filters.
 ///         The energy of each frame: num_frames x 1
-pub fn mfe(
-    signal: ArrayView1<f64>,
-    sampling_frequency: usize,
-    frame_length: f64,           /*=0.020*/
-    frame_stride: f64,           /*=0.01*/
-    num_filters: usize,          /*=40*/
-    fft_length: usize,           /*=512*/
-    low_frequency: f64,          /*=0*/
-    high_frequency: Option<f64>, /*None*/
-) -> (Array2<f64>, Array1<f64>) {
+pub fn mfe(signal: ArrayView1<f64>, speech_config: &SpeechConfig) -> (Array2<f64>, Array1<f64>) {
     //
     // Stack frames
     let frames = stack_frames(
         signal,
-        sampling_frequency,
-        frame_length,
-        frame_stride,
+        speech_config.sample_rate,
+        speech_config.frame_length,
+        speech_config.frame_stride,
         None,
         false,
     );
 
-    // getting the high frequency
-    let high_frequency = high_frequency.unwrap_or(sampling_frequency as f64 / 2.);
-
     // calculation of the power spectrum
-    let power_spectrum = crate::processing::power_spectrum(frames, fft_length);
-    let coefficients = power_spectrum.shape()[1];
+    let power_spectrum = crate::processing::power_spectrum(frames, speech_config.fft_points);
+
     // this stores the total energy in each frame
     let frame_energies = power_spectrum.sum_axis(Axis(1));
 
     // Handling zero energies.
     let frame_energies = zero_handling(frame_energies);
 
-    // Extracting the filterbank
-    let filter_banks = filterbanks(
-        num_filters,
-        coefficients,
-        sampling_frequency as f64,
-        Some(low_frequency),
-        Some(high_frequency),
-    );
-
     // Filterbank energies
-    let features = power_spectrum.dot(&filter_banks.reversed_axes());
+    let features = power_spectrum.dot(&speech_config.filter_banks.view().reversed_axes());
     let features = crate::functions::zero_handling(features);
 
     (features, frame_energies)
@@ -247,41 +189,11 @@ pub fn mfe(
 ///    Args:
 ///         signal : the audio signal from which to compute features.
 ///             Should be an N x 1 array
-///         sampling_frequency : the sampling frequency of the signal
-///             we are working with.
-///         frame_length : the length of each frame in seconds.
-///             Default is 0.020s
-///         frame_stride : the step between successive frames in seconds.
-///             Default is 0.02s (means no overlap)
-///         num_filters : the number of filters in the filterbank,
-///             default 40.
-///         fft_length : number of FFT points. Default is 512.
-///         low_frequency : lowest band edge of mel filters.
-///             In Hz, default is 0.
-///         high_frequency : highest band edge of mel filters.
-///             In Hz, default is samplerate/2
+///         speech_config: the configuration for the speech processing functions
 ///    Returns:
 ///         array: Features - The log energy of fiterbank of size num_frames x num_filters frame_log_energies. The log energy of each frame num_frames x 1
-fn lmfe(
-    signal: ArrayView1<f64>,
-    sampling_frequency: usize,
-    frame_length: f64,           /*=0.020*/
-    frame_stride: f64,           /*=0.01*/
-    num_filters: usize,          /*=40*/
-    fft_length: usize,           /*=512*/
-    low_frequency: f64,          /*=0*/
-    high_frequency: Option<f64>, /*None*/
-) -> Array2<f64> {
-    let (feature, _frame_energies) = mfe(
-        signal,
-        sampling_frequency,
-        frame_length,
-        frame_stride,
-        num_filters,
-        fft_length,
-        low_frequency,
-        high_frequency,
-    );
+fn lmfe(signal: ArrayView1<f64>, speech_config: &SpeechConfig) -> Array2<f64> {
+    let (feature, _) = mfe(signal, speech_config);
     feature.log()
 }
 
