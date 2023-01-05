@@ -1,4 +1,7 @@
 from functools import lru_cache
+from ._internal import mfcc as internal_mfcc, _speech_config, cmvn, preemphasis
+
+__all__ = ["mfcc", "preemphasis", "cmvn"]
 
 
 @lru_cache(maxsize=32)
@@ -17,7 +20,17 @@ def _get_speech_config(
 
     this function returns a config object to be used by the rust code, avoids recomputing elements where possible
     """
-    pass
+    return _speech_config(
+        sampling_frequency,
+        frame_length,
+        frame_stride,
+        num_cepstral,
+        num_filters,
+        fft_length,
+        low_frequency,
+        high_frequency,
+        dc_elimination,
+    )
 
 
 def mfcc(
@@ -55,4 +68,15 @@ def mfcc(
     Returns:
         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
     """
-    pass
+    config = _get_speech_config(
+        sampling_frequency,
+        frame_length,
+        frame_stride,
+        num_cepstral,
+        num_filters,
+        fft_length,
+        low_frequency,
+        high_frequency,
+        dc_elimination,
+    )
+    return internal_mfcc(signal, config)
