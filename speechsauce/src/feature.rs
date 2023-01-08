@@ -21,7 +21,7 @@ use ndrustfft::{nddct2, DctHandler};
 ///     high_freq : highest band edge of mel filters,
 ///         default samplerate/2
 /// Returns:
-///         array: A numpy array of size num_filter x (fftpoints//2 + 1)
+///         array: A ndarray of size num_filter x (fftpoints//2 + 1)
 ///             which are filterbank
 pub(crate) fn filterbanks(
     num_filter: usize,
@@ -30,6 +30,7 @@ pub(crate) fn filterbanks(
     low_freq: Option<f64>,
     high_freq: Option<f64>,
 ) -> Array2<f64> {
+    //TODO: compare to https://pytorch.org/audio/main/_modules/torchaudio/functional/functional.html#melscale_fbanks
     let high_freq = high_freq.unwrap_or(sampling_freq / 2.0);
     let low_freq = low_freq.unwrap_or(300.0);
     assert!(
@@ -131,7 +132,10 @@ pub fn mfcc(signal: ArrayView1<f64>, speech_config: &SpeechConfig) -> Array2<f64
     }
     transformed_feature
 }
-
+//TODO: https://pytorch.org/audio/main/_modules/torchaudio/transforms/_transforms.html#MelSpectrogram
+fn mel_spectrogram(signal: ArrayView1<f64>, speech_config: &SpeechConfig) {
+    todo!()
+}
 ///a helper function that is passed to stack_frames from mfe
 fn _f_it(x: usize) -> Array2<f64> {
     Array2::<f64>::ones((x, 1))
