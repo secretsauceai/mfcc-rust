@@ -23,6 +23,8 @@ pub struct SpeechConfigBuilder {
     high_frequency: f64,
     /// If the first dc component should be eliminated or not
     dc_elimination: bool,
+    // for mel_spectrogram
+    //power: u8,
 }
 
 impl SpeechConfigBuilder {
@@ -31,7 +33,7 @@ impl SpeechConfigBuilder {
             sample_rate,
             fft_points: 512,
             frame_length: 0.02,
-            frame_stride: 0.02,
+            frame_stride: 0.01,
             num_cepstral: 13,
             num_filters: 40,
             low_frequency: 0.0,
