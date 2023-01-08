@@ -1,3 +1,6 @@
 /target
 Cargo.lock
 /py-speechsauce/.venv
+py-speechsauce/speechsauce/*.abi3.so
+py-speechsauce/src/lib.rs
+py-speechsauce/**/__pycache__/*

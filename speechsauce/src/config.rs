@@ -4,7 +4,7 @@ use ndrustfft::{DctHandler, R2cFftHandler};
 use crate::feature::filterbanks;
 
 #[derive(Default)]
-pub struct MfccConfigBuilder {
+pub struct SpeechConfigBuilder {
     ///sampling frequency of the signal
     sample_rate: usize,
     /// number of FFT points.
@@ -25,9 +25,9 @@ pub struct MfccConfigBuilder {
     dc_elimination: bool,
 }
 
-impl MfccConfigBuilder {
-    fn new(sample_rate: usize) -> MfccConfigBuilder {
-        MfccConfigBuilder {
+impl SpeechConfigBuilder {
+    pub fn new(sample_rate: usize) -> SpeechConfigBuilder {
+        SpeechConfigBuilder {
             sample_rate,
             fft_points: 512,
             frame_length: 0.02,
@@ -40,43 +40,43 @@ impl MfccConfigBuilder {
         }
     }
 
-    pub fn high_freq(mut self, high_frequency: f64) -> MfccConfigBuilder {
+    pub fn high_freq(mut self, high_frequency: f64) -> SpeechConfigBuilder {
         self.high_frequency = high_frequency;
         self
     }
 
-    pub fn dc_elimination(mut self, dc_elimination: bool) -> MfccConfigBuilder {
+    pub fn dc_elimination(mut self, dc_elimination: bool) -> SpeechConfigBuilder {
         self.dc_elimination = dc_elimination;
         self
     }
 
-    pub fn low_freq(mut self, low_frequency: f64) -> MfccConfigBuilder {
+    pub fn low_freq(mut self, low_frequency: f64) -> SpeechConfigBuilder {
         self.low_frequency = low_frequency;
         self
     }
 
-    pub fn num_cepstral(mut self, num_cepstral: usize) -> MfccConfigBuilder {
+    pub fn num_cepstral(mut self, num_cepstral: usize) -> SpeechConfigBuilder {
         self.num_cepstral = num_cepstral;
         self
     }
 
-    pub fn frame_stride(mut self, frame_stride: f64) -> MfccConfigBuilder {
+    pub fn frame_stride(mut self, frame_stride: f64) -> SpeechConfigBuilder {
         self.frame_stride = frame_stride;
         self
     }
 
-    pub fn frame_length(mut self, frame_length: f64) -> MfccConfigBuilder {
+    pub fn frame_length(mut self, frame_length: f64) -> SpeechConfigBuilder {
         self.frame_length = frame_length;
         self
     }
 
-    pub fn fft_points(mut self, fft_points: usize) -> MfccConfigBuilder {
+    pub fn fft_points(mut self, fft_points: usize) -> SpeechConfigBuilder {
         self.fft_points = fft_points;
         self
     }
 
-    pub fn build(self) -> MfccConfig {
-        MfccConfig::new(
+    pub fn build(self) -> SpeechConfig {
+        SpeechConfig::new(
             self.sample_rate,
             self.fft_points,
             self.frame_length,
@@ -90,33 +90,34 @@ impl MfccConfigBuilder {
     }
 }
 
-pub struct MfccConfig {
+#[derive(Clone)]
+pub struct SpeechConfig {
     ///sampling frequency of the signal
-    sample_rate: usize,
+    pub sample_rate: usize,
     /// number of FFT points.
-    fft_points: usize,
+    pub fft_points: usize,
     /// the length of each frame in seconds.
-    frame_length: f64, // =0.020,
+    pub frame_length: f64, // =0.020,
     /// the step between successive frames in seconds.
-    frame_stride: f64, // =0.01,
+    pub frame_stride: f64, // =0.01,
     /// Number of cepstral coefficients.
-    num_cepstral: usize, // =13,
+    pub num_cepstral: usize, // =13,
     /// the number of filters in the filterbank
-    num_filters: usize, // =40,
+    pub num_filters: usize, // =40,
     ///lowest band edge of mel filters in Hz
-    low_frequency: f64,
+    pub low_frequency: f64,
     ///highest band edge of mel filters in Hz.
-    high_frequency: f64,
+    pub high_frequency: f64,
     /// If the first dc component should be eliminated or not
-    dc_elimination: bool,
+    pub dc_elimination: bool,
     ///for
-    dct_handler: DctHandler<f64>,
-    fft_handler: R2cFftHandler<f64>,
+    pub dct_handler: DctHandler<f64>,
+    pub fft_handler: R2cFftHandler<f64>,
     /// Mel-filterbanks
-    filter_banks: Array2<f64>,
+    pub filter_banks: Array2<f64>,
 }
 
-impl MfccConfig {
+impl SpeechConfig {
     pub fn new(
         sample_rate: usize,
         fft_points: usize,
@@ -150,7 +151,7 @@ impl MfccConfig {
         }
     }
 
-    pub fn builder() -> MfccConfigBuilder {
-        MfccConfigBuilder::default()
+    pub fn builder() -> SpeechConfigBuilder {
+        SpeechConfigBuilder::default()
     }
 }

@@ -1,10 +1,28 @@
+use std::sync::Arc;
 
-use pyo3::prelude::*;
-use numpy::{IntoPyArray, PyReadonlyArray1, PyReadonlyArray2, PyArray2, PyArray1};
-use speechsauce::{feature,processing};
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, ToPyArray};
+use pyo3::{callback::IntoPyCallbackOutput, prelude::*};
+use speechsauce::{config::SpeechConfig, feature, processing};
+#[pyclass]
+#[repr(transparent)]
+#[derive(Clone)]
+pub struct PySpeechConfig(SpeechConfig);
+
+impl IntoPyCallbackOutput<Self> for PySpeechConfig {
+    fn convert(self, py: Python<'_>) -> PyResult<Self> {
+        Ok(self)
+    }
+}
+
+impl IntoPy<SpeechConfig> for PySpeechConfig {
+    fn into_py(self, py: Python<'_>) -> SpeechConfig {
+        self.0
+    }
+}
 
 #[pymodule]
-fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()>{
+fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    m.add_class::<PySpeechConfig>()?;
     /// Compute MFCC features from an audio signal.
     ///     Args:
     ///          signal : the audio signal from which to compute features.
@@ -29,8 +47,39 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()>{
     ///         array: A numpy array of size (num_frames x num_cepstral) containing mfcc features.
     #[pyfn(m)]
     fn mfcc<'py>(
-        py: Python<'py>, 
+        py: Python<'py>,
         signal: PyReadonlyArray1<f64>,
+        config: Py<PySpeechConfig>,
+    ) -> &'py PyArray2<f64> {
+        let cell = config.as_ref(py);
+        let obj_ref = cell.borrow();
+        let speech_config = &obj_ref.0;
+        feature::mfcc(signal.as_array(), &speech_config).to_pyarray(py)
+    }
+
+    //TODO: #14 make signal a mutable borrow (PyReadWriteArray) once the next version of numpy-rust is released
+    #[pyfn(m)]
+    fn preemphasis<'py>(
+        py: Python<'py>,
+        signal: PyReadonlyArray1<f64>,
+        shift: isize,
+        cof: f64,
+    ) -> &'py PyArray1<f64> {
+        processing::preemphasis(signal.as_array().to_owned(), shift, cof).into_pyarray(py)
+    }
+
+    #[pyfn(m)]
+    fn cmvn<'py>(
+        py: Python<'py>,
+        vec: PyReadonlyArray2<f64>,
+        variance_normalization: bool,
+    ) -> &'py PyArray2<f64> {
+        processing::cmvn(vec.as_array(), variance_normalization).into_pyarray(py)
+    }
+
+    #[pyfn(m)]
+    fn _speech_config<'py>(
+        py: Python<'py>,
         sampling_frequency: usize,
         frame_length: f64,           // =0.020,
         frame_stride: f64,           // =0.01,
@@ -40,26 +89,22 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()>{
         low_frequency: f64,          // =0,
         high_frequency: Option<f64>, // =None,
         dc_elimination: bool,        //True
-    ) -> &'py PyArray2<f64>{
-        feature::mfcc(signal.as_array(), sampling_frequency, frame_length, frame_stride, num_cepstral, num_filters, fft_length, low_frequency, high_frequency, dc_elimination).into_pyarray(py)
+    ) -> Py<PySpeechConfig> {
+        Py::new(
+            py,
+            PySpeechConfig(SpeechConfig::new(
+                sampling_frequency,
+                fft_length,
+                frame_length,
+                frame_stride,
+                num_cepstral,
+                num_filters,
+                low_frequency,
+                high_frequency.unwrap_or(sampling_frequency as f64 / 2.0),
+                dc_elimination,
+            )),
+        )
+        .unwrap()
     }
-    
-    //TODO: #14 make signal a mutable borrow (PyReadWriteArray) once the next version of numpy-rust is released
-    #[pyfn(m)]
-    fn preemphasis<'py>(
-        py: Python<'py>, 
-        signal: PyReadonlyArray1<f64>, 
-        shift: isize, 
-        cof: f64 
-    ) -> &'py PyArray1<f64>{
-        processing::preemphasis(signal.as_array().to_owned(), shift, cof).into_pyarray(py)
-    }
-
-    #[pyfn(m)]
-    fn cmvn<'py>(py: Python<'py>, vec: PyReadonlyArray2<f64>, variance_normalization: bool)-> &'py PyArray2<f64>
-    {
-        processing::cmvn(vec.as_array(), variance_normalization).into_pyarray(py)
-    }
-    
     Ok(())
 }
