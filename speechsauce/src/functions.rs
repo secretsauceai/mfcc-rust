@@ -67,7 +67,7 @@ fn stft(
     n_fft: usize,
     hop_length: Option<usize>,
     win_length: Option<usize>,
-    window: &ArrayD<f64>,
+    window: Option<&ArrayD<f64>>,
     center: bool,
     pad_mode: PadType,
 ) -> ArrayD<f64> {
@@ -86,8 +86,12 @@ fn stft(
         y.ndim() >= 1 && y.ndim() <= 2,
         "y must have 1 or 2 dimensions"
     );
+    //right now hard coding hann window, though librosa is way more flexible
+    let window = window.unwrap_or(&hann_window(win_length, n_fft));
 
     // Compute the window
+    //PS> FUTURE ME. I'm leaving off here, investigate the padding function in util of librosa, see
+    //if we can alter our existing padding function to work with it.
     let fft_window = compute_fft_window(window, win_length, n_fft);
 
     // Compute the padding
@@ -114,7 +118,7 @@ fn stft(
         let t_offset = start + t * hop_length;
         input_frame.assign(&padded_y.slice(s![t_offset..t_offset + n_fft]));
         input_frame *= &fft_window;
-        let fft_output = ndfft_r compute_fft(&mut fft, &input_frame);
+        let fft_output = compute_fft(&mut fft, &input_frame);
         let stft_frame = &mut stft_matrix.slice_mut(s![.., t]);
         copy_stft_frame(fft_output, stft_frame);
     }
@@ -122,17 +126,30 @@ fn stft(
     stft_matrix
 }
 
-fn compute_fft_window(window: &NdArrayD, win_length: usize, n_fft: usize) -> ArrayD<f32> {
+fn compute_fft_window(window: &ArrayD<f64>, win_length: usize, n_fft: usize) -> ArrayD<f32> {
     let fft_window = if window.shape() == &[win_length] {
         window.view()
     } else {
         let fft_window = window
             .into_shape((win_length,))
             .unwrap_or_else(|_| {
-                panic!("window must have length equal to or less than win_length={}", win_length)
+                panic!(
+                    "window must have length equal to or less than win_length={}",
+                    win_length
+                )
             })
             .to_owned();
         pad_fft_window(&fft_window, n_fft)
     };
     fft_window.to_owned()
+}
+
+fn hann_window(win_length: usize, n_fft: usize) -> ArrayD<f64> {
+    let mut fft_window = Array::zeros((n_fft,));
+    let mut window = Array::zeros((win_length,));
+    for i in 0..win_length {
+        window[i] = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f64 / win_length as f64).cos());
+    }
+    fft_window.slice_mut(s![0..win_length]).assign(&window);
+    fft_window
 }
