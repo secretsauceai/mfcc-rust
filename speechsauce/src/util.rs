@@ -1,12 +1,6 @@
-
-
 use ndarray::{
-    Array, Array2, ArrayView, ArrayViewMut, Axis,
-    Dimension, Slice, ArrayView2, s,
+    s, Array, Array1, Array2, ArrayView, ArrayView2, ArrayViewMut, Axis, Dimension, Slice,
 };
-
-
-
 
 pub(crate) enum PadType {
     Constant,
@@ -22,18 +16,15 @@ pub(crate) enum EdgeColOp {
     Right,
 }
 
-
 //this works for how repeat is called in our project
-pub(crate) fn repeat_axis<A>(arr: ArrayView2<A>, ax:Axis, nrep: usize) -> Array2<A>
+pub(crate) fn repeat_axis<A>(arr: ArrayView2<A>, ax: Axis, nrep: usize) -> Array2<A>
 where
     A: Clone + std::fmt::Display + num_traits::Zero,
-    
 {
-       
-    ndarray::concatenate(ax, &vec![arr;nrep]).unwrap()
+    ndarray::concatenate(ax, &vec![arr; nrep]).unwrap()
 }
 
-//prepends 
+//prepends
 fn _new_shape(current_ndims: usize, min_ndims: usize, reps: &mut Vec<usize>) {
     if current_ndims < min_ndims {
         // in case of fire: https://github.com/numpy/numpy/blob/v1.22.0/numpy/lib/shape_base.py#L1250
@@ -46,7 +37,30 @@ fn _new_shape(current_ndims: usize, min_ndims: usize, reps: &mut Vec<usize>) {
         *reps = tmp;
     }
 }
-
+pub(crate) fn pad_center1(arr: &Array1<f64>, size: usize, pad_type: PadType) -> Array1<f64> {
+    let n = arr.len();
+    let mut lpad = 0;
+    let mut rpad = 0;
+    if size > n {
+        match pad_type {
+            PadType::Constant => {
+                lpad = (size - n) / 2;
+                rpad = size - n - lpad;
+            }
+            PadType::Symmetric => {
+                lpad = (size - n + 1) / 2;
+                rpad = size - n - lpad;
+            }
+            PadType::Edge => {
+                lpad = 0;
+                rpad = size - n;
+            }
+        }
+    }
+    let mut out = ndarray::Array1::<f64>::zeros(size);
+    out.slice_mut(s![lpad..lpad + n]).assign(&arr);
+    out
+}
 /// Pad the edges of an array with zeros.
 ///
 /// `pad_width` specifies the length of the padding at the beginning
@@ -63,8 +77,7 @@ pub(crate) fn pad(
     pad_width: Vec<[usize; 2]>,
     const_value: f64,
     pad_type: PadType,
-) -> Array2<f64>
-{
+) -> Array2<f64> {
     assert_eq!(
         arr.ndim(),
         pad_width.len(),
@@ -82,9 +95,9 @@ pub(crate) fn pad(
     {
         // Select portion of padded array that needs to be copied from the
         // original array.
-        let row=arr.shape()[0];
-        let col=arr.shape()[1];
-        let mut orig_portion = padded.slice_mut(s![..row,..col]);
+        let row = arr.shape()[0];
+        let col = arr.shape()[1];
+        let mut orig_portion = padded.slice_mut(s![..row, ..col]);
         // Copy the data from the original array.
         orig_portion.assign(arr);
         match pad_type {
@@ -369,28 +382,42 @@ impl<A: num_traits::real::Real, I: ndarray::Dimension> ArrayLog<A, I> for Array<
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use ndarray::array;
     use ndarray::concatenate;
-    use super::*;
-
-    
 
     #[test]
-    fn tile_equiv_test(){
-        let arr1= array![[1,2],[3,4]];
-        let arr2=array![[1,2,3,4]];
+    fn tile_equiv_test() {
+        let arr1 = array![[1, 2], [3, 4]];
+        let arr2 = array![[1, 2, 3, 4]];
         //these two assertions are from the examples in the numpy docs for tiling with reps all one save
         //for first value
         //https://numpy.org/doc/stable/reference/generated/numpy.tile.html
-        assert_eq!(concatenate![Axis(0),arr1,arr1], array![[1,2],[3,4],[1,2],[3,4]]);
-        assert_eq!(repeat_axis(arr2.view(),Axis(0),4),array![[1,2,3,4],[1,2,3,4],[1,2,3,4],[1,2,3,4]])
-
+        assert_eq!(
+            concatenate![Axis(0), arr1, arr1],
+            array![[1, 2], [3, 4], [1, 2], [3, 4]]
+        );
+        assert_eq!(
+            repeat_axis(arr2.view(), Axis(0), 4),
+            array![[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]
+        )
     }
 
     #[test]
     fn repeat_test() {
-        let input_arr=array![[1,2,3,4]];
-        assert_eq!(repeat_axis(input_arr.view(),Axis(0),2),array![[1,2,3,4],[1,2,3,4]])
+        let input_arr = array![[1, 2, 3, 4]];
+        assert_eq!(
+            repeat_axis(input_arr.view(), Axis(0), 2),
+            array![[1, 2, 3, 4], [1, 2, 3, 4]]
+        )
+    }
+
+    #[test]
+    fn pad_center1_test() {
+        let input_arr = array![[1, 2, 3, 4]];
+        let size = 9;
+        let padded_arr = pad_center1(input_arr.view(), size, PadType::Constant(0));
+        assert_eq!(padded_arr, array![[0, 0, 1, 2, 3, 4, 0, 0, 0]])
     }
 
     //TODO: add test for pad

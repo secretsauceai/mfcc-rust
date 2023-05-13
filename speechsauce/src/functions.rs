@@ -1,6 +1,6 @@
 /// contains necessary functions for calculating the features in the `features` module.
 use ndarray::{s, Array, Array1, ArrayD, Dimension, Zip};
-use stft::realfft::RealFftPlanner;
+use ndrustfft::
 
 use crate::util::PadType;
 
@@ -91,12 +91,14 @@ fn stft(
 
     // Compute the window
     //PS> FUTURE ME. I'm leaving off here, investigate the padding function in util of librosa, see
-    //if we can alter our existing padding function to work with it.
+    //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/filters.py#L1184
     let fft_window = compute_fft_window(window, win_length, n_fft);
 
     // Compute the padding
-    let (padded_y, start, extra) = compute_padding(y, center, pad_mode, n_fft, hop_length);
-
+    //pad center:
+    //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/util/utils.py#L398
+    let (padded_y, start, extra) = compute_padding(fft_window, n_fft);
+    
     // Allocate the STFT matrix
     let n_frames = (y.len() - start) / hop_length + 1 + extra;
     let stft_matrix = if let Some(mut out_array) = out {
@@ -118,7 +120,7 @@ fn stft(
         let t_offset = start + t * hop_length;
         input_frame.assign(&padded_y.slice(s![t_offset..t_offset + n_fft]));
         input_frame *= &fft_window;
-        let fft_output = compute_fft(&mut fft, &input_frame);
+        let fft_output = (&mut fft, &input_frame);
         let stft_frame = &mut stft_matrix.slice_mut(s![.., t]);
         copy_stft_frame(fft_output, stft_frame);
     }
@@ -126,6 +128,15 @@ fn stft(
     stft_matrix
 }
 
+fn compute_padding(y: &ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<ndarray::IxDynImpl>>, n_fft: usize) -> _ {
+    if y.shape()[0] < n_fft {
+        panic!("Input signal length={} must be at least as long as frame length={}", y.shape()[0], n_fft);
+    }
+    let n_frames = (y.shape()[0] - n_fft) / hop_length + 1;
+
+}
+
+//https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/filters.py#L1184
 fn compute_fft_window(window: &ArrayD<f64>, win_length: usize, n_fft: usize) -> ArrayD<f32> {
     let fft_window = if window.shape() == &[win_length] {
         window.view()
