@@ -133,8 +133,10 @@ pub fn mfcc(signal: ArrayView1<f64>, speech_config: &SpeechConfig) -> Array2<f64
     transformed_feature
 }
 //TODO: https://pytorch.org/audio/main/_modules/torchaudio/transforms/_transforms.html#MelSpectrogram
+//https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/feature/spectral.py#LL2021C5-L2021C5
 fn mel_spectrogram(signal: ArrayView1<f64>, speech_config: &SpeechConfig) {
-    todo!()
+    //ndarray::einsum
+    todo!("implement mel_spectrogram")
 }
 ///a helper function that is passed to stack_frames from mfe
 fn _f_it(x: usize) -> Array2<f64> {

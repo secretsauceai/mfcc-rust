@@ -1,8 +1,8 @@
 /// contains necessary functions for calculating the features in the `features` module.
-use ndarray::{s, Array, Array1, ArrayD, Dimension, Zip};
-use ndrustfft::
+use ndarray::{s, Array, Array1, ArrayD, Dimension, Shape, Zip};
+use ndrustfft::Complex;
 
-use crate::util::PadType;
+use crate::util::{pad_center1, PadType};
 
 /// converts a single value representing a frequency in Hz to Mel scale.
 pub fn frequency_to_mel(f: f64) -> f64 {
@@ -70,7 +70,8 @@ fn stft(
     window: Option<&ArrayD<f64>>,
     center: bool,
     pad_mode: PadType,
-) -> ArrayD<f64> {
+    out: Option<&mut ArrayD<Complex<f64>>>,
+) -> ArrayD<Complex<f64>> {
     // By default, use the entire frame
     let win_length = win_length.unwrap_or(n_fft);
 
@@ -87,7 +88,10 @@ fn stft(
         "y must have 1 or 2 dimensions"
     );
     //right now hard coding hann window, though librosa is way more flexible
-    let window = window.unwrap_or(&hann_window(win_length, n_fft));
+    //looks like the hann window is 1D, but the next part changes the dimensionality
+    //to (1, y.shape()*), so fft is either 2 or 3 dimensional
+    let binding = hann_window(win_length, n_fft).into_dyn();
+    let window = window.unwrap_or(&binding);
 
     // Compute the window
     //PS> FUTURE ME. I'm leaving off here, investigate the padding function in util of librosa, see
@@ -97,69 +101,87 @@ fn stft(
     // Compute the padding
     //pad center:
     //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/util/utils.py#L398
-    let (padded_y, start, extra) = compute_padding(fft_window, n_fft);
-    
+    let (padded_y, start, extra) = compute_padding(&fft_window, n_fft, hop_length);
+
     // Allocate the STFT matrix
     let n_frames = (y.len() - start) / hop_length + 1 + extra;
-    let stft_matrix = if let Some(mut out_array) = out {
+    let mut stft_matrix = if let Some(mut out_array) = out {
         assert!(
-            out_array.shape()[..out_array.ndim() - 1]
-                == &[1 + n_fft / 2, n_frames.try_into().unwrap()],
+            out_array.shape()[..out_array.ndim() - 1] == [1 + n_fft / 2, n_frames],
             "Shape mismatch for provided output array"
         );
         out_array.view_mut()
     } else {
-        Array::zeros((1 + n_fft / 2, n_frames.try_into().unwrap()))
+        // let out = Array::zeros((1 + n_fft / 2, n_frames))
+        //     .into_dyn()
+        //     .view_mut();
+        // out
+        todo!()
     };
 
     // Compute the STFT
-    let mut planner = RealFftPlanner::new();
-    let fft = planner.plan_fft_forward(n_fft);
+    let mut planner: ndrustfft::R2cFftHandler<f64> = ndrustfft::R2cFftHandler::new(n_fft);
+
     let mut input_frame = Array::zeros((n_fft,));
+    let mut output = Array::zeros((1 + n_fft / 2,));
     for t in 0..n_frames {
         let t_offset = start + t * hop_length;
         input_frame.assign(&padded_y.slice(s![t_offset..t_offset + n_fft]));
         input_frame *= &fft_window;
-        let fft_output = (&mut fft, &input_frame);
+        ndrustfft::ndfft_r2c(&input_frame, &mut output, &mut planner, 0);
+
         let stft_frame = &mut stft_matrix.slice_mut(s![.., t]);
-        copy_stft_frame(fft_output, stft_frame);
+        stft_frame.assign(&output);
     }
 
-    stft_matrix
+    stft_matrix.into_owned()
 }
 
-fn compute_padding(y: &ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<ndarray::IxDynImpl>>, n_fft: usize) -> _ {
+fn compute_padding(
+    y: &ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<ndarray::IxDynImpl>>,
+    n_fft: usize,
+    hop_length: usize,
+) -> (ArrayD<f64>, usize, usize) {
     if y.shape()[0] < n_fft {
-        panic!("Input signal length={} must be at least as long as frame length={}", y.shape()[0], n_fft);
+        panic!(
+            "Input signal length={} must be at least as long as frame length={}",
+            y.shape()[0],
+            n_fft
+        );
     }
-    let n_frames = (y.shape()[0] - n_fft) / hop_length + 1;
-
+    //let n_frames = (y.shape()[0] - n_fft) / hop_length + 1;
+    //let n_columns = n_fft + (n_frames - 1) * hop_length;
+    //let pad_width = n_columns - y.shape()[0];
+    //let mut padded_y = Array::zeros((n_columns,));
+    //padded_y.slice_mut(s![..y.shape()[0]]).assign(y);
+    todo!()
 }
 
 //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/filters.py#L1184
-fn compute_fft_window(window: &ArrayD<f64>, win_length: usize, n_fft: usize) -> ArrayD<f32> {
-    let fft_window = if window.shape() == &[win_length] {
-        window.view()
-    } else {
-        let fft_window = window
-            .into_shape((win_length,))
-            .unwrap_or_else(|_| {
-                panic!(
-                    "window must have length equal to or less than win_length={}",
-                    win_length
-                )
-            })
-            .to_owned();
-        pad_fft_window(&fft_window, n_fft)
-    };
-    fft_window.to_owned()
+fn compute_fft_window(window: &ArrayD<f64>, win_length: usize, n_fft: usize) -> ArrayD<f64> {
+    // let fft_window = if window.shape() == &[win_length] {
+    //     window.view()
+    // } else {
+    //     let fft_window = window
+    //         .into_shape((win_length,))
+    //         .unwrap_or_else(|_| {
+    //             panic!(
+    //                 "window must have length equal to or less than win_length={}",
+    //                 win_length
+    //             )
+    //         })
+    //         .to_owned();
+    //     pad_center1(&fft_window, n_fft).into_dyn()
+    // };
+    // fft_window.to_owned()
+    todo!()
 }
 
-fn hann_window(win_length: usize, n_fft: usize) -> ArrayD<f64> {
+fn hann_window(win_length: usize, n_fft: usize) -> Array1<f64> {
     let mut fft_window = Array::zeros((n_fft,));
     let mut window = Array::zeros((win_length,));
     for i in 0..win_length {
-        window[i] = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f64 / win_length as f64).cos());
+        window[i] = 0.5 * (1.0 - (2.0 * std::f64::consts::PI * i as f64 / win_length as f64).cos());
     }
     fft_window.slice_mut(s![0..win_length]).assign(&window);
     fft_window
