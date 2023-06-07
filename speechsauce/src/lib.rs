@@ -15,7 +15,7 @@ mod tests {
 
     use crate::processing::{cmvn, preemphasis, stack_frames};
 
-    fn create_signal() -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {
+    fn create_signal() -> ndarray::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::Dim<[usize; 1]>> {
         let mu = 0.; //mean
         let sigma = 0.1; //standard deviation
         Array::random(1000000, Normal::new(mu, sigma).unwrap())
@@ -31,12 +31,12 @@ mod tests {
     fn get_num_frames(
         signal_len: usize,
         sample_rate: usize,
-        frame_length: f64,
-        frame_stride: f64,
+        frame_length: f32,
+        frame_stride: f32,
     ) -> usize {
-        let window_size = (frame_length * sample_rate as f64).round();
-        let step = (frame_stride * sample_rate as f64).round();
-        ((signal_len as f64 - window_size) / step).ceil() as usize
+        let window_size = (frame_length * sample_rate as f32).round();
+        let step = (frame_stride * sample_rate as f32).round();
+        ((signal_len as f32 - window_size) / step).ceil() as usize
     }
     #[test]
     fn test_preemphasis() {
@@ -53,7 +53,7 @@ mod tests {
         let freq = sampling_frequency();
         let frame_length = 0.02;
         let frame_stride = 0.02;
-        //let filter: fn(usize) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> = |x:usize| -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 1]>> {Array1::<f64>::ones(x)};
+        //let filter: fn(usize) -> ndarray::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::Dim<[usize; 1]>> = |x:usize| -> ndarray::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::Dim<[usize; 1]>> {Array1::<f32>::ones(x)};
         let zero_padding = true;
         let frames = stack_frames(
             signal.view(),
@@ -80,6 +80,10 @@ mod tests {
         let output_mean = normalized_feature.mean_axis(ndarray::Axis(0)).unwrap();
         //TODO: verify the shape of cvmn and np.zeroes((1,x))
         //should be comparing two 1d arrays in original code
+        // println!(
+        //     "{:?}",
+        //     (&output_mean - &ndarray::Array1::<f32>::zeros(normalized_feature.shape()[1]))
+        // );
         assert!(
             output_mean.abs_diff_eq(&ndarray::Array1::zeros(normalized_feature.shape()[1]), 1e-8)
         );

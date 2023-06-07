@@ -73,11 +73,11 @@ pub(crate) fn pad_center1(arr: &Array1<f64>, size: usize, pad_type: PadType) -> 
 /// potentially relevant SO post: https://stackoverflow.com/questions/61758934/how-can-i-write-a-generic-function-that-takes-either-an-ndarray-array-or-arrayvi
 
 pub(crate) fn pad(
-    arr: &Array2<f64>,
+    arr: &Array2<f32>,
     pad_width: Vec<[usize; 2]>,
-    const_value: f64,
+    const_value: f32,
     pad_type: PadType,
-) -> Array2<f64> {
+) -> Array2<f32> {
     assert_eq!(
         arr.ndim(),
         pad_width.len(),

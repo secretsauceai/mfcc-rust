@@ -48,9 +48,9 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     #[pyfn(m)]
     fn mfcc<'py>(
         py: Python<'py>,
-        signal: PyReadonlyArray1<f64>,
+        signal: PyReadonlyArray1<f32>,
         config: Py<PySpeechConfig>,
-    ) -> &'py PyArray2<f64> {
+    ) -> &'py PyArray2<f32> {
         let cell = config.as_ref(py);
         let obj_ref = cell.borrow();
         let speech_config = &obj_ref.0;
@@ -61,19 +61,19 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     #[pyfn(m)]
     fn preemphasis<'py>(
         py: Python<'py>,
-        signal: PyReadonlyArray1<f64>,
+        signal: PyReadonlyArray1<f32>,
         shift: isize,
-        cof: f64,
-    ) -> &'py PyArray1<f64> {
+        cof: f32,
+    ) -> &'py PyArray1<f32> {
         processing::preemphasis(signal.as_array().to_owned(), shift, cof).into_pyarray(py)
     }
 
     #[pyfn(m)]
     fn cmvn<'py>(
         py: Python<'py>,
-        vec: PyReadonlyArray2<f64>,
+        vec: PyReadonlyArray2<f32>,
         variance_normalization: bool,
-    ) -> &'py PyArray2<f64> {
+    ) -> &'py PyArray2<f32> {
         processing::cmvn(vec.as_array(), variance_normalization).into_pyarray(py)
     }
 
@@ -81,13 +81,13 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     fn _speech_config<'py>(
         py: Python<'py>,
         sampling_frequency: usize,
-        frame_length: f64,           // =0.020,
-        frame_stride: f64,           // =0.01,
+        frame_length: f32,           // =0.020,
+        frame_stride: f32,           // =0.01,
         num_cepstral: usize,         // =13,
         num_filters: usize,          // =40,
         fft_length: usize,           // =512,
-        low_frequency: f64,          // =0,
-        high_frequency: Option<f64>, // =None,
+        low_frequency: f32,          // =0,
+        high_frequency: Option<f32>, // =None,
         dc_elimination: bool,        //True
     ) -> Py<PySpeechConfig> {
         Py::new(
@@ -100,7 +100,7 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
                 num_cepstral,
                 num_filters,
                 low_frequency,
-                high_frequency.unwrap_or(sampling_frequency as f64 / 2.0),
+                high_frequency.unwrap_or(sampling_frequency as f32 / 2.0),
                 dc_elimination,
             )),
         )

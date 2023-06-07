@@ -10,17 +10,17 @@ pub struct SpeechConfigBuilder {
     /// number of FFT points.
     fft_points: usize,
     /// the length of each frame in seconds.
-    frame_length: f64, // =0.020,
+    frame_length: f32, // =0.020,
     /// the step between successive frames in seconds.
-    frame_stride: f64, // =0.01,
+    frame_stride: f32, // =0.01,
     /// Number of cepstral coefficients.
     num_cepstral: usize, // =13,
     /// the number of filters in the filterbank
     num_filters: usize, // =40,
     ///lowest band edge of mel filters in Hz
-    low_frequency: f64,
+    low_frequency: f32,
     ///highest band edge of mel filters in Hz.
-    high_frequency: f64,
+    high_frequency: f32,
     /// If the first dc component should be eliminated or not
     dc_elimination: bool,
     // for mel_spectrogram
@@ -37,12 +37,12 @@ impl SpeechConfigBuilder {
             num_cepstral: 13,
             num_filters: 40,
             low_frequency: 0.0,
-            high_frequency: sample_rate as f64 / 2.0,
+            high_frequency: sample_rate as f32 / 2.0,
             dc_elimination: true,
         }
     }
 
-    pub fn high_freq(mut self, high_frequency: f64) -> SpeechConfigBuilder {
+    pub fn high_freq(mut self, high_frequency: f32) -> SpeechConfigBuilder {
         self.high_frequency = high_frequency;
         self
     }
@@ -52,7 +52,7 @@ impl SpeechConfigBuilder {
         self
     }
 
-    pub fn low_freq(mut self, low_frequency: f64) -> SpeechConfigBuilder {
+    pub fn low_freq(mut self, low_frequency: f32) -> SpeechConfigBuilder {
         self.low_frequency = low_frequency;
         self
     }
@@ -62,12 +62,12 @@ impl SpeechConfigBuilder {
         self
     }
 
-    pub fn frame_stride(mut self, frame_stride: f64) -> SpeechConfigBuilder {
+    pub fn frame_stride(mut self, frame_stride: f32) -> SpeechConfigBuilder {
         self.frame_stride = frame_stride;
         self
     }
 
-    pub fn frame_length(mut self, frame_length: f64) -> SpeechConfigBuilder {
+    pub fn frame_length(mut self, frame_length: f32) -> SpeechConfigBuilder {
         self.frame_length = frame_length;
         self
     }
@@ -99,36 +99,36 @@ pub struct SpeechConfig {
     /// number of FFT points.
     pub fft_points: usize,
     /// the length of each frame in seconds.
-    pub frame_length: f64, // =0.020,
+    pub frame_length: f32, // =0.020,
     /// the step between successive frames in seconds.
-    pub frame_stride: f64, // =0.01,
+    pub frame_stride: f32, // =0.01,
     /// Number of cepstral coefficients.
     pub num_cepstral: usize, // =13,
     /// the number of filters in the filterbank
     pub num_filters: usize, // =40,
     ///lowest band edge of mel filters in Hz
-    pub low_frequency: f64,
+    pub low_frequency: f32,
     ///highest band edge of mel filters in Hz.
-    pub high_frequency: f64,
+    pub high_frequency: f32,
     /// If the first dc component should be eliminated or not
     pub dc_elimination: bool,
     ///for
-    pub dct_handler: DctHandler<f64>,
-    pub fft_handler: R2cFftHandler<f64>,
+    pub dct_handler: DctHandler<f32>,
+    pub fft_handler: R2cFftHandler<f32>,
     /// Mel-filterbanks
-    pub filter_banks: Array2<f64>,
+    pub filter_banks: Array2<f32>,
 }
 
 impl SpeechConfig {
     pub fn new(
         sample_rate: usize,
         fft_points: usize,
-        frame_length: f64,
-        frame_stride: f64,
+        frame_length: f32,
+        frame_stride: f32,
         num_cepstral: usize,
         num_filters: usize,
-        low_frequency: f64,
-        high_frequency: f64,
+        low_frequency: f32,
+        high_frequency: f32,
         dc_elimination: bool,
     ) -> Self {
         Self {
@@ -146,7 +146,7 @@ impl SpeechConfig {
             filter_banks: filterbanks(
                 num_filters,
                 (fft_points / 2) + 1,
-                sample_rate as f64,
+                sample_rate as f32,
                 Some(low_frequency),
                 Some(high_frequency),
             ),
