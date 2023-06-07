@@ -1,8 +1,12 @@
+use crate::{
+    config::SpeechConfig,
+    util::{pad_center1, PadType},
+};
+use itertools::izip;
 /// contains necessary functions for calculating the features in the `features` module.
-use ndarray::{s, Array, Array1, ArrayD, Dimension, Shape, Zip};
+use ndarray::{s, Array, Array1, Array3, ArrayD, ArrayView2, Axis, Dimension, Shape, Slice, Zip};
 use ndrustfft::Complex;
-
-use crate::util::{pad_center1, PadType};
+use num_complex::Complex32;
 
 /// converts a single value representing a frequency in Hz to Mel scale.
 pub fn frequency_to_mel(f: f32) -> f32 {
@@ -56,13 +60,106 @@ pub fn zero_handling<D>(x: Array<f32, D>) -> Array<f32, D>
 where
     D: Dimension,
 {
-    x.mapv(|x| if x == 0.0 { std::f64::EPSILON } else { x })
+    x.mapv(|x| if x == 0.0 { std::f32::EPSILON } else { x })
 }
 
 // https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/core/spectrum.py#L46
 ///Short time Fourier transform (STFT)
 /// TODO:
-fn stft(
+
+// Short time Fourier transform. credit goes to https://github.com/Rikorose for the original implementation
+///
+/// Args:
+///   - `input`: array of shape (C, T)
+///   - `state`: DFState
+///   - `reset`: Whether to reset STFT buffers
+///
+/// Returns:
+///   - `spectrum`: complex array of shape (C, T', F)
+pub fn stft2(
+    input: ArrayView2<f32>,
+    speech_config: &mut SpeechConfig,
+    reset: bool,
+) -> Array3<Complex32> {
+    // if reset {
+    //     speech_config.reset();
+    // }
+    let ch = input.len_of(Axis(0));
+    let ttd = input.len_of(Axis(1));
+    let n_pad = speech_config.window_size / speech_config.frame_size - 1;
+    let tfd = (ttd as f32 / speech_config.frame_size as f32).ceil() as usize + n_pad;
+    let mut output: Array3<Complex32> = Array3::zeros((ch, tfd, speech_config.freq_size));
+    for (input_ch, mut output_ch) in input.outer_iter().zip(output.outer_iter_mut()) {
+        for (ichunk, mut ochunk) in input_ch
+            .axis_chunks_iter(Axis(0), speech_config.frame_size)
+            .zip(output_ch.outer_iter_mut())
+        {
+            let ichunk = ichunk.as_slice().expect("stft ichunk has wrong shape");
+            if ichunk.len() == speech_config.frame_size {
+                frame_analysis(
+                    ichunk,
+                    ochunk.as_slice_mut().expect("stft ochunk has wrong shape"),
+                    speech_config,
+                )
+            } else {
+                let pad = vec![0.; speech_config.frame_size - ichunk.len()];
+                frame_analysis(
+                    &[ichunk, pad.as_slice()].concat(),
+                    ochunk.as_slice_mut().expect("stft ochunk has wrong shape"),
+                    speech_config,
+                )
+            };
+        }
+    }
+    output.slice_axis_inplace(Axis(1), Slice::from(n_pad..));
+    output
+}
+
+fn frame_analysis(input: &[f32], output: &mut [Complex32], state: &mut SpeechConfig) {
+    debug_assert_eq!(input.len(), state.frame_size);
+    debug_assert_eq!(output.len(), state.freq_size);
+
+    let mut buf = state.fft_forward.make_input_vec();
+    // First part of the window on the previous frame
+    let (buf_first, buf_second) = buf.split_at_mut(state.window_size - state.frame_size);
+    let (window_first, window_second) = state.window.split_at(state.window_size - state.frame_size);
+    let analysis_split = state.analysis_mem.len() - state.frame_size;
+    for (&y, &w, x) in izip!(
+        state.analysis_mem.iter(),
+        window_first.iter(),
+        buf_first.iter_mut(),
+    ) {
+        *x = y * w;
+    }
+    // Second part of the window on the new input frame
+    for ((&y, &w), x) in input
+        .iter()
+        .zip(window_second.iter())
+        .zip(buf_second.iter_mut())
+    {
+        *x = y * w;
+    }
+    // Shift analysis_mem
+    if analysis_split > 0 {
+        // hop_size is < window_size / 2
+        state.analysis_mem.rotate_left(state.frame_size);
+    }
+    // Copy input to analysis_mem for next iteration
+    for (x, &y) in state.analysis_mem[analysis_split..].iter_mut().zip(input) {
+        *x = y
+    }
+    state
+        .fft_forward
+        .process_with_scratch(&mut buf, output, &mut state.analysis_scratch)
+        .expect("FFT forward failed");
+    // Apply normalization in analysis only
+    let norm = state.wnorm;
+    for x in output.iter_mut() {
+        *x *= norm;
+    }
+}
+
+fn _old_stft(
     y: &ArrayD<f64>,
     n_fft: usize,
     hop_length: Option<usize>,

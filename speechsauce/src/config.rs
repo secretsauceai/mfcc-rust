@@ -97,7 +97,8 @@ pub struct SpeechConfig {
     ///sampling frequency of the signal
     pub sample_rate: usize,
     /// number of FFT points.
-    pub fft_points: usize,
+    pub window_size: usize,
+    pub window_size_half: usize,
     /// the length of each frame in seconds.
     pub frame_length: f32, // =0.020,
     /// the step between successive frames in seconds.
@@ -110,9 +111,14 @@ pub struct SpeechConfig {
     pub low_frequency: f32,
     ///highest band edge of mel filters in Hz.
     pub high_frequency: f32,
+    /// Number of frequency bins, which is (window_size/2)+1
+    pub freq_size: usize,
+    /// Number of samples in a frame, which is frame_length * sample_rate
+    pub frame_size: usize,
     /// If the first dc component should be eliminated or not
     pub dc_elimination: bool,
-    ///for
+    pub window: Vec<f32>,
+    pub analysis_mem: Vec<f32>,
     pub dct_handler: DctHandler<f32>,
     pub fft_handler: R2cFftHandler<f32>,
     /// Mel-filterbanks
@@ -131,11 +137,23 @@ impl SpeechConfig {
         high_frequency: f32,
         dc_elimination: bool,
     ) -> Self {
+        // Initialize the vorbis window: sin(pi/2*sin^2(pi*n/N))
+        let pi = std::f64::consts::PI;
+        let mut fft = RealFftPlanner::<f32>::new();
+        let frame_size = (frame_length * sample_rate as f32) as usize;
+        let window_size_h = fft_points / 2;
+        let mut window = vec![0.0; fft_points];
+        for (i, w) in window.iter_mut().enumerate() {
+            let sin = (0.5 * pi * (i as f64 + 0.5) / window_size_h as f64).sin();
+            *w = (0.5 * pi * sin * sin).sin() as f32;
+        }
+        let analysis_mem = vec![0.; fft_points - frame_size];
         Self {
             dct_handler: DctHandler::new(num_filters),
             fft_handler: R2cFftHandler::new(fft_points),
-            sample_rate,
-            fft_points,
+            fft_forward: sample_rate,
+            window_size: fft_points,
+            window_size_half: window_size_h,
             frame_length,
             frame_stride,
             num_cepstral,
@@ -143,6 +161,9 @@ impl SpeechConfig {
             low_frequency,
             high_frequency,
             dc_elimination,
+            freq_size: (fft_points / 2) + 1,
+            frame_size: frame_size,
+            window,
             filter_banks: filterbanks(
                 num_filters,
                 (fft_points / 2) + 1,

@@ -176,7 +176,7 @@ pub fn mfe(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> (Array2<f32
     );
 
     // calculation of the power spectrum
-    let power_spectrum = crate::processing::power_spectrum(frames, speech_config.fft_points);
+    let power_spectrum = crate::processing::power_spectrum(frames, speech_config.window_size);
 
     // this stores the total energy in each frame
     let frame_energies = power_spectrum.sum_axis(Axis(1));
