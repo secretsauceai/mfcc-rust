@@ -7,8 +7,10 @@ edition = "2018"
 
 [dependencies]
 ndarray="^0.15"
-ndrustfft = "^0.3"
+ndrustfft = "0.4.0"
 num-traits = "0.2.15"
+#stft = {git="https://github.com/toastmod/stft.git",branch="master"}
+#apodise
 
 [dev-dependencies]
 ndarray={version="^0.15",features=["approx"]}

@@ -1,4 +1,6 @@
-use ndarray::{s, Array, Array2, ArrayView, ArrayView2, ArrayViewMut, Axis, Dimension, Slice};
+use ndarray::{
+    s, Array, Array1, Array2, ArrayView, ArrayView2, ArrayViewMut, Axis, Dimension, Slice,
+};
 
 pub(crate) enum PadType {
     Constant,
@@ -35,7 +37,30 @@ fn _new_shape(current_ndims: usize, min_ndims: usize, reps: &mut Vec<usize>) {
         *reps = tmp;
     }
 }
-
+pub(crate) fn pad_center1(arr: &Array1<f64>, size: usize, pad_type: PadType) -> Array1<f64> {
+    let n = arr.len();
+    let mut lpad = 0;
+    let mut rpad = 0;
+    if size > n {
+        match pad_type {
+            PadType::Constant => {
+                lpad = (size - n) / 2;
+                rpad = size - n - lpad;
+            }
+            PadType::Symmetric => {
+                lpad = (size - n + 1) / 2;
+                rpad = size - n - lpad;
+            }
+            PadType::Edge => {
+                lpad = 0;
+                rpad = size - n;
+            }
+        }
+    }
+    let mut out = ndarray::Array1::<f64>::zeros(size);
+    out.slice_mut(s![lpad..lpad + n]).assign(&arr);
+    out
+}
 /// Pad the edges of an array with zeros.
 ///
 /// `pad_width` specifies the length of the padding at the beginning
@@ -385,6 +410,15 @@ mod test {
             repeat_axis(input_arr.view(), Axis(0), 2),
             array![[1, 2, 3, 4], [1, 2, 3, 4]]
         )
+    }
+
+    #[test]
+    fn pad_center1_test() {
+        let input_arr = array![[1, 2, 3, 4]];
+        let size = 9;
+        // let padded_arr = pad_center1(input_arr.view(), size, PadType::Constant(0));
+        // assert_eq!(padded_arr, array![[0, 0, 1, 2, 3, 4, 0, 0, 0]])
+        todo!()
     }
 
     //TODO: add test for pad
