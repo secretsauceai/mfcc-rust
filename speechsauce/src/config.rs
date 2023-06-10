@@ -1,7 +1,11 @@
+use std::sync::Arc;
+
 use ndarray::Array2;
 use ndrustfft::{DctHandler, R2cFftHandler};
+use num_complex::Complex32;
 
 use crate::feature::filterbanks;
+use realfft::{RealFftPlanner, RealToComplex};
 
 #[derive(Default)]
 pub struct SpeechConfigBuilder {
@@ -117,12 +121,15 @@ pub struct SpeechConfig {
     pub frame_size: usize,
     /// If the first dc component should be eliminated or not
     pub dc_elimination: bool,
+    pub wnorm: f32,
     pub window: Vec<f32>,
     pub analysis_mem: Vec<f32>,
     pub dct_handler: DctHandler<f32>,
     pub fft_handler: R2cFftHandler<f32>,
+    pub fft_forward: Arc<dyn RealToComplex<f32>>,
     /// Mel-filterbanks
     pub filter_banks: Array2<f32>,
+    pub analysis_scratch: Vec<Complex32>,
 }
 
 impl SpeechConfig {
@@ -147,11 +154,13 @@ impl SpeechConfig {
             let sin = (0.5 * pi * (i as f64 + 0.5) / window_size_h as f64).sin();
             *w = (0.5 * pi * sin * sin).sin() as f32;
         }
+        let forward = fft.plan_fft_forward(fft_points);
         let analysis_mem = vec![0.; fft_points - frame_size];
+        let analysis_scratch = forward.make_scratch_vec();
         Self {
             dct_handler: DctHandler::new(num_filters),
             fft_handler: R2cFftHandler::new(fft_points),
-            fft_forward: sample_rate,
+            fft_forward: forward,
             window_size: fft_points,
             window_size_half: window_size_h,
             frame_length,
@@ -161,9 +170,13 @@ impl SpeechConfig {
             low_frequency,
             high_frequency,
             dc_elimination,
+            sample_rate,
+            wnorm: 1.0 / (fft_points.pow(2) as f32 / (2 * frame_size) as f32),
             freq_size: (fft_points / 2) + 1,
             frame_size: frame_size,
             window,
+            analysis_mem,
+            analysis_scratch: analysis_scratch,
             filter_banks: filterbanks(
                 num_filters,
                 (fft_points / 2) + 1,

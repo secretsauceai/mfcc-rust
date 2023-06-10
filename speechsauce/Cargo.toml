@@ -11,6 +11,8 @@ ndrustfft = "0.4.0"
 num-traits = "0.2.15"
 num-complex = "0.4.3"
 itertools="0.10.5"
+realfft = "3.2.0"
+einsum-derive = "0.1"
 #stft = {git="https://github.com/toastmod/stft.git",branch="master"}
 #apodise
 

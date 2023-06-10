@@ -4,7 +4,10 @@ use crate::{
 };
 use itertools::izip;
 /// contains necessary functions for calculating the features in the `features` module.
-use ndarray::{s, Array, Array1, Array3, ArrayD, ArrayView2, Axis, Dimension, Shape, Slice, Zip};
+use ndarray::{
+    s, Array, Array1, Array2, Array3, ArrayD, ArrayView1, ArrayView2, Axis, Dimension, Shape,
+    Slice, Zip,
+};
 use ndrustfft::Complex;
 use num_complex::Complex32;
 
@@ -79,7 +82,7 @@ where
 pub fn stft2(
     input: ArrayView2<f32>,
     speech_config: &mut SpeechConfig,
-    reset: bool,
+    //reset: bool,
 ) -> Array3<Complex32> {
     // if reset {
     //     speech_config.reset();
@@ -159,127 +162,162 @@ fn frame_analysis(input: &[f32], output: &mut [Complex32], state: &mut SpeechCon
     }
 }
 
-fn _old_stft(
-    y: &ArrayD<f64>,
-    n_fft: usize,
-    hop_length: Option<usize>,
-    win_length: Option<usize>,
-    window: Option<&ArrayD<f64>>,
-    center: bool,
-    pad_mode: PadType,
-    out: Option<&mut ArrayD<Complex<f64>>>,
-) -> ArrayD<Complex<f64>> {
-    // By default, use the entire frame
-    let win_length = win_length.unwrap_or(n_fft);
-
-    // Set the default hop, if it's not already specified
-    let hop_length = match hop_length {
-        Some(hop) if hop > 0 => hop,
-        Some(hop) => panic!("hop_length={} must be a positive integer", hop),
-        None => win_length / 4,
-    };
-
-    // Check audio is valid
-    assert!(
-        y.ndim() >= 1 && y.ndim() <= 2,
-        "y must have 1 or 2 dimensions"
-    );
-    //right now hard coding hann window, though librosa is way more flexible
-    //looks like the hann window is 1D, but the next part changes the dimensionality
-    //to (1, y.shape()*), so fft is either 2 or 3 dimensional
-    let binding = hann_window(win_length, n_fft).into_dyn();
-    let window = window.unwrap_or(&binding);
-
-    // Compute the window
-    //PS> FUTURE ME. I'm leaving off here, investigate the padding function in util of librosa, see
-    //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/filters.py#L1184
-    let fft_window = compute_fft_window(window, win_length, n_fft);
-
-    // Compute the padding
-    //pad center:
-    //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/util/utils.py#L398
-    let (padded_y, start, extra) = compute_padding(&fft_window, n_fft, hop_length);
-
-    // Allocate the STFT matrix
-    let n_frames = (y.len() - start) / hop_length + 1 + extra;
-    let mut stft_matrix = if let Some(mut out_array) = out {
-        assert!(
-            out_array.shape()[..out_array.ndim() - 1] == [1 + n_fft / 2, n_frames],
-            "Shape mismatch for provided output array"
-        );
-        out_array.view_mut()
-    } else {
-        // let out = Array::zeros((1 + n_fft / 2, n_frames))
-        //     .into_dyn()
-        //     .view_mut();
-        // out
-        todo!()
-    };
-
-    // Compute the STFT
-    let mut planner: ndrustfft::R2cFftHandler<f64> = ndrustfft::R2cFftHandler::new(n_fft);
-
-    let mut input_frame = Array::zeros((n_fft,));
-    let mut output = Array::zeros((1 + n_fft / 2,));
-    for t in 0..n_frames {
-        let t_offset = start + t * hop_length;
-        input_frame.assign(&padded_y.slice(s![t_offset..t_offset + n_fft]));
-        input_frame *= &fft_window;
-        ndrustfft::ndfft_r2c(&input_frame, &mut output, &mut planner, 0);
-
-        let stft_frame = &mut stft_matrix.slice_mut(s![.., t]);
-        stft_frame.assign(&output);
+pub fn stft1(
+    input: ArrayView1<f32>,
+    speech_config: &mut SpeechConfig,
+    //reset: bool,
+) -> Array2<Complex32> {
+    // if reset {
+    //     speech_config.reset();
+    // }
+    let ttd = input.len_of(Axis(0));
+    let n_pad = speech_config.window_size / speech_config.frame_size - 1;
+    let tfd = (ttd as f32 / speech_config.frame_size as f32).ceil() as usize + n_pad;
+    let mut output: Array2<Complex32> = Array2::zeros((tfd, speech_config.freq_size));
+    for (ichunk, mut ochunk) in input
+        .axis_chunks_iter(Axis(0), speech_config.frame_size)
+        .zip(output.outer_iter_mut())
+    {
+        let ichunk = ichunk.as_slice().expect("stft ichunk has wrong shape");
+        if ichunk.len() == speech_config.frame_size {
+            frame_analysis(
+                ichunk,
+                ochunk.as_slice_mut().expect("stft ochunk has wrong shape"),
+                speech_config,
+            )
+        } else {
+            let pad = vec![0.; speech_config.frame_size - ichunk.len()];
+            frame_analysis(
+                &[ichunk, pad.as_slice()].concat(),
+                ochunk.as_slice_mut().expect("stft ochunk has wrong shape"),
+                speech_config,
+            )
+        };
     }
-
-    stft_matrix.into_owned()
+    output.slice_axis_inplace(Axis(0), Slice::from(n_pad..));
+    output
 }
+// fn _old_stft(
+//     y: &ArrayD<f64>,
+//     n_fft: usize,
+//     hop_length: Option<usize>,
+//     win_length: Option<usize>,
+//     window: Option<&ArrayD<f64>>,
+//     center: bool,
+//     pad_mode: PadType,
+//     out: Option<&mut ArrayD<Complex<f64>>>,
+// ) -> ArrayD<Complex<f64>> {
+//     // By default, use the entire frame
+//     let win_length = win_length.unwrap_or(n_fft);
 
-fn compute_padding(
-    y: &ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<ndarray::IxDynImpl>>,
-    n_fft: usize,
-    hop_length: usize,
-) -> (ArrayD<f64>, usize, usize) {
-    if y.shape()[0] < n_fft {
-        panic!(
-            "Input signal length={} must be at least as long as frame length={}",
-            y.shape()[0],
-            n_fft
-        );
-    }
-    //let n_frames = (y.shape()[0] - n_fft) / hop_length + 1;
-    //let n_columns = n_fft + (n_frames - 1) * hop_length;
-    //let pad_width = n_columns - y.shape()[0];
-    //let mut padded_y = Array::zeros((n_columns,));
-    //padded_y.slice_mut(s![..y.shape()[0]]).assign(y);
-    todo!()
-}
+//     // Set the default hop, if it's not already specified
+//     let hop_length = match hop_length {
+//         Some(hop) if hop > 0 => hop,
+//         Some(hop) => panic!("hop_length={} must be a positive integer", hop),
+//         None => win_length / 4,
+//     };
 
-//https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/filters.py#L1184
-fn compute_fft_window(window: &ArrayD<f64>, win_length: usize, n_fft: usize) -> ArrayD<f64> {
-    // let fft_window = if window.shape() == &[win_length] {
-    //     window.view()
-    // } else {
-    //     let fft_window = window
-    //         .into_shape((win_length,))
-    //         .unwrap_or_else(|_| {
-    //             panic!(
-    //                 "window must have length equal to or less than win_length={}",
-    //                 win_length
-    //             )
-    //         })
-    //         .to_owned();
-    //     pad_center1(&fft_window, n_fft).into_dyn()
-    // };
-    // fft_window.to_owned()
-    todo!()
-}
+//     // Check audio is valid
+//     assert!(
+//         y.ndim() >= 1 && y.ndim() <= 2,
+//         "y must have 1 or 2 dimensions"
+//     );
+//     //right now hard coding hann window, though librosa is way more flexible
+//     //looks like the hann window is 1D, but the next part changes the dimensionality
+//     //to (1, y.shape()*), so fft is either 2 or 3 dimensional
+//     let binding = hann_window(win_length, n_fft).into_dyn();
+//     let window = window.unwrap_or(&binding);
 
-fn hann_window(win_length: usize, n_fft: usize) -> Array1<f64> {
-    let mut fft_window = Array::zeros((n_fft,));
-    let mut window = Array::zeros((win_length,));
-    for i in 0..win_length {
-        window[i] = 0.5 * (1.0 - (2.0 * std::f64::consts::PI * i as f64 / win_length as f64).cos());
-    }
-    fft_window.slice_mut(s![0..win_length]).assign(&window);
-    fft_window
-}
+//     // Compute the window
+//     //PS> FUTURE ME. I'm leaving off here, investigate the padding function in util of librosa, see
+//     //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/filters.py#L1184
+//     let fft_window = compute_fft_window(window, win_length, n_fft);
+
+//     // Compute the padding
+//     //pad center:
+//     //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/util/utils.py#L398
+//     let (padded_y, start, extra) = compute_padding(&fft_window, n_fft, hop_length);
+
+//     // Allocate the STFT matrix
+//     let n_frames = (y.len() - start) / hop_length + 1 + extra;
+//     let mut stft_matrix = if let Some(mut out_array) = out {
+//         assert!(
+//             out_array.shape()[..out_array.ndim() - 1] == [1 + n_fft / 2, n_frames],
+//             "Shape mismatch for provided output array"
+//         );
+//         out_array.view_mut()
+//     } else {
+//         // let out = Array::zeros((1 + n_fft / 2, n_frames))
+//         //     .into_dyn()
+//         //     .view_mut();
+//         // out
+//         todo!()
+//     };
+
+//     // Compute the STFT
+//     let mut planner: ndrustfft::R2cFftHandler<f64> = ndrustfft::R2cFftHandler::new(n_fft);
+
+//     let mut input_frame = Array::zeros((n_fft,));
+//     let mut output = Array::zeros((1 + n_fft / 2,));
+//     for t in 0..n_frames {
+//         let t_offset = start + t * hop_length;
+//         input_frame.assign(&padded_y.slice(s![t_offset..t_offset + n_fft]));
+//         input_frame *= &fft_window;
+//         ndrustfft::ndfft_r2c(&input_frame, &mut output, &mut planner, 0);
+
+//         let stft_frame = &mut stft_matrix.slice_mut(s![.., t]);
+//         stft_frame.assign(&output);
+//     }
+
+//     stft_matrix.into_owned()
+// }
+
+// fn compute_padding(
+//     y: &ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<ndarray::IxDynImpl>>,
+//     n_fft: usize,
+//     hop_length: usize,
+// ) -> (ArrayD<f64>, usize, usize) {
+//     if y.shape()[0] < n_fft {
+//         panic!(
+//             "Input signal length={} must be at least as long as frame length={}",
+//             y.shape()[0],
+//             n_fft
+//         );
+//     }
+//     //let n_frames = (y.shape()[0] - n_fft) / hop_length + 1;
+//     //let n_columns = n_fft + (n_frames - 1) * hop_length;
+//     //let pad_width = n_columns - y.shape()[0];
+//     //let mut padded_y = Array::zeros((n_columns,));
+//     //padded_y.slice_mut(s![..y.shape()[0]]).assign(y);
+//     todo!()
+// }
+
+// //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/filters.py#L1184
+// fn compute_fft_window(window: &ArrayD<f64>, win_length: usize, n_fft: usize) -> ArrayD<f64> {
+//     // let fft_window = if window.shape() == &[win_length] {
+//     //     window.view()
+//     // } else {
+//     //     let fft_window = window
+//     //         .into_shape((win_length,))
+//     //         .unwrap_or_else(|_| {
+//     //             panic!(
+//     //                 "window must have length equal to or less than win_length={}",
+//     //                 win_length
+//     //             )
+//     //         })
+//     //         .to_owned();
+//     //     pad_center1(&fft_window, n_fft).into_dyn()
+//     // };
+//     // fft_window.to_owned()
+//     todo!()
+// }
+
+// fn hann_window(win_length: usize, n_fft: usize) -> Array1<f64> {
+//     let mut fft_window = Array::zeros((n_fft,));
+//     let mut window = Array::zeros((win_length,));
+//     for i in 0..win_length {
+//         window[i] = 0.5 * (1.0 - (2.0 * std::f64::consts::PI * i as f64 / win_length as f64).cos());
+//     }
+//     fft_window.slice_mut(s![0..win_length]).assign(&window);
+//     fft_window
+// }

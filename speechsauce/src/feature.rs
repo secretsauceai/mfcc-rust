@@ -1,15 +1,19 @@
 use crate::config::SpeechConfig;
 /// This module provides functions for calculating the main speech
 /// features that the package is aimed to extract as well as the required elements.
-use crate::functions::{frequency_to_mel, mel_arr_to_frequency, triangle, zero_handling};
+use crate::functions::{
+    frequency_to_mel, mel_arr_to_frequency, stft1, stft2, triangle, zero_handling,
+};
 use crate::processing::stack_frames;
 use crate::util::ArrayLog;
 
+use einsum_derive::einsum;
 use ndarray::{
-    concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayView1, ArrayViewMut1, Axis, Dim,
-    Dimension, Ix2, NewAxis, Slice,
+    concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayView1, ArrayView2,
+    ArrayViewMut1, Axis, Dim, Dimension, Ix2, NewAxis, Slice,
 };
 use ndrustfft::{nddct2, DctHandler};
+use num_complex::ComplexFloat;
 
 /// Compute the Mel-filterbanks. Each filter will be stored in one rows.
 ///The columns correspond to fft bins.
@@ -134,9 +138,24 @@ pub fn mfcc(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32
 }
 //TODO: https://pytorch.org/audio/main/_modules/torchaudio/transforms/_transforms.html#MelSpectrogram
 //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/feature/spectral.py#LL2021C5-L2021C5
-fn mel_spectrogram(signal: ArrayView1<f32>, speech_config: &SpeechConfig) {
-    //ndarray::einsum
-    todo!("implement mel_spectrogram")
+fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &mut SpeechConfig) -> Array2<f32> {
+    let mut transformed_signal = stft1(signal, speech_config).mapv(|x| x.abs().powi(2));
+    //"...ft,mf->...mt"
+    einsum!(
+        "ft,mf->mt",
+        transformed_signal,
+        (speech_config).filter_banks.clone()
+    )
+}
+fn mel_spectrogram2(signal: ArrayView2<f32>, speech_config: &mut SpeechConfig) -> Array3<f32> {
+    let transformed_signal = stft2(signal, speech_config).mapv(|x| x.abs().powi(2));
+
+    //"...ft,mf->...mt"
+    einsum!(
+        "ntf, mf -> nmt",
+        transformed_signal,
+        speech_config.filter_banks.clone(),
+    )
 }
 ///a helper function that is passed to stack_frames from mfe
 fn _f_it(x: usize) -> Array2<f32> {
