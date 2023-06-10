@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
-use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, ToPyArray};
+use ::speechsauce::{config::SpeechConfig, feature, processing};
+use numpy::{
+    IntoPyArray, PyArray1, PyArray2, PyArrayDyn, PyReadonlyArray1, PyReadonlyArray2,
+    PyReadonlyArrayDyn, ToPyArray,
+};
 use pyo3::{callback::IntoPyCallbackOutput, prelude::*};
-use speechsauce::{config::SpeechConfig, feature, processing};
 #[pyclass]
 #[repr(transparent)]
 #[derive(Clone)]
@@ -55,6 +58,33 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         let obj_ref = cell.borrow();
         let speech_config = &obj_ref.0;
         feature::mfcc(signal.as_array(), &speech_config).to_pyarray(py)
+    }
+
+    #[pyfn(m)]
+    fn mel_spectrogram<'py>(
+        py: Python<'py>,
+        signal: PyReadonlyArrayDyn<f32>,
+        config: Py<PySpeechConfig>,
+    ) -> &'py PyArrayDyn<f32> {
+        let cell = config.as_ref(py);
+        let obj_ref = cell.borrow();
+        let speech_config = obj_ref.0;
+        let result = match signal.ndim() {
+            1 => feature::mel_spectrogram1(
+                signal.as_array().into_dimensionality().unwrap(),
+                speech_config,
+            )
+            .into_dyn(),
+            2 => feature::mel_spectrogram2(
+                signal.as_array().into_dimensionality().unwrap(),
+                speech_config,
+            )
+            .into_dyn(),
+            _ => {
+                panic!("Input signal must be 1d or 2d")
+            }
+        };
+        result.to_pyarray(py)
     }
 
     //TODO: #14 make signal a mutable borrow (PyReadWriteArray) once the next version of numpy-rust is released

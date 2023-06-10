@@ -7,6 +7,8 @@ use crate::functions::{
 use crate::processing::stack_frames;
 use crate::util::ArrayLog;
 
+use cached::proc_macro::cached;
+use cached::SizedCache;
 use einsum_derive::einsum;
 use ndarray::{
     concatenate, s, Array, Array1, Array2, Array3, ArrayBase, ArrayView1, ArrayView2,
@@ -14,7 +16,11 @@ use ndarray::{
 };
 use ndrustfft::{nddct2, DctHandler};
 use num_complex::ComplexFloat;
-
+#[cached(
+    type = "SizedCache<(usize, usize, usize, u32, u32), Array2<f32>>",
+    create = "{ SizedCache::with_size(16) }",
+    convert = "{(num_filter, coefficients, sample_rate, low_freq.unwrap_or(0.0).to_bits(), high_freq.unwrap_or(0.0).to_bits())}"
+)]
 /// Compute the Mel-filterbanks. Each filter will be stored in one rows.
 ///The columns correspond to fft bins.
 /// Args:
@@ -30,10 +36,11 @@ use num_complex::ComplexFloat;
 pub(crate) fn filterbanks(
     num_filter: usize,
     coefficients: usize,
-    sampling_freq: f32,
+    sample_rate: usize,
     low_freq: Option<f32>,
     high_freq: Option<f32>,
 ) -> Array2<f32> {
+    let sampling_freq = sample_rate as f32;
     //TODO: compare to https://pytorch.org/audio/main/_modules/torchaudio/functional/functional.html#melscale_fbanks
     let high_freq = high_freq.unwrap_or(sampling_freq / 2.0);
     let low_freq = low_freq.unwrap_or(300.0);
@@ -138,24 +145,29 @@ pub fn mfcc(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32
 }
 //TODO: https://pytorch.org/audio/main/_modules/torchaudio/transforms/_transforms.html#MelSpectrogram
 //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/feature/spectral.py#LL2021C5-L2021C5
-fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &mut SpeechConfig) -> Array2<f32> {
-    let mut transformed_signal = stft1(signal, speech_config).mapv(|x| x.abs().powi(2));
+pub fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &mut SpeechConfig) -> Array2<f32> {
+    let transformed_signal = stft1(signal, speech_config).mapv(|x| x.abs().powi(2));
+    let filter_banks = filterbanks(
+        speech_config.num_filters,
+        speech_config.freq_size,
+        speech_config.sample_rate,
+        Some(speech_config.low_frequency),
+        Some(speech_config.high_frequency),
+    );
     //"...ft,mf->...mt"
-    einsum!(
-        "ft,mf->mt",
-        transformed_signal,
-        (speech_config).filter_banks.clone()
-    )
+    einsum!("ft,mf->mt", transformed_signal, filter_banks)
 }
-fn mel_spectrogram2(signal: ArrayView2<f32>, speech_config: &mut SpeechConfig) -> Array3<f32> {
+pub fn mel_spectrogram2(signal: ArrayView2<f32>, speech_config: &mut SpeechConfig) -> Array3<f32> {
     let transformed_signal = stft2(signal, speech_config).mapv(|x| x.abs().powi(2));
-
+    let filter_banks = filterbanks(
+        speech_config.num_filters,
+        speech_config.freq_size,
+        speech_config.sample_rate,
+        Some(speech_config.low_frequency),
+        Some(speech_config.high_frequency),
+    );
     //"...ft,mf->...mt"
-    einsum!(
-        "ntf, mf -> nmt",
-        transformed_signal,
-        speech_config.filter_banks.clone(),
-    )
+    einsum!("ntf, mf -> nmt", transformed_signal, filter_banks,)
 }
 ///a helper function that is passed to stack_frames from mfe
 fn _f_it(x: usize) -> Array2<f32> {
@@ -204,7 +216,14 @@ pub fn mfe(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> (Array2<f32
     let frame_energies = zero_handling(frame_energies);
 
     // Filterbank energies
-    let features = power_spectrum.dot(&speech_config.filter_banks.view().reversed_axes());
+    let filter_banks = filterbanks(
+        speech_config.num_filters,
+        speech_config.freq_size,
+        speech_config.sample_rate,
+        Some(speech_config.low_frequency),
+        Some(speech_config.high_frequency),
+    );
+    let features = power_spectrum.dot(&filter_banks.view().reversed_axes());
     let features = crate::functions::zero_handling(features);
 
     (features, frame_energies)

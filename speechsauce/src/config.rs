@@ -127,8 +127,6 @@ pub struct SpeechConfig {
     pub dct_handler: DctHandler<f32>,
     pub fft_handler: R2cFftHandler<f32>,
     pub fft_forward: Arc<dyn RealToComplex<f32>>,
-    /// Mel-filterbanks
-    pub filter_banks: Array2<f32>,
     pub analysis_scratch: Vec<Complex32>,
 }
 
@@ -177,13 +175,6 @@ impl SpeechConfig {
             window,
             analysis_mem,
             analysis_scratch: analysis_scratch,
-            filter_banks: filterbanks(
-                num_filters,
-                (fft_points / 2) + 1,
-                sample_rate as f32,
-                Some(low_frequency),
-                Some(high_frequency),
-            ),
         }
     }
 
