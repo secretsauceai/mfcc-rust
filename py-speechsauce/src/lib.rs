@@ -9,23 +9,140 @@ use pyo3::{callback::IntoPyCallbackOutput, prelude::*};
 #[pyclass]
 #[repr(transparent)]
 #[derive(Clone)]
-pub struct PySpeechConfig(SpeechConfig);
+pub struct PySpeechSauce(SpeechConfig);
 
-impl IntoPyCallbackOutput<Self> for PySpeechConfig {
+impl IntoPyCallbackOutput<Self> for PySpeechSauce {
     fn convert(self, py: Python<'_>) -> PyResult<Self> {
         Ok(self)
     }
 }
 
-impl IntoPy<SpeechConfig> for PySpeechConfig {
+impl IntoPy<SpeechConfig> for PySpeechSauce {
     fn into_py(self, py: Python<'_>) -> SpeechConfig {
         self.0
     }
 }
 
+// #[pymethods]
+// impl PySpeechSauce {
+//     #[new]
+//     fn new(
+//         sample_rate: usize,
+//         fft_points: usize,
+//         frame_length: f32,
+//         frame_stride: f32,
+//         num_cepstral: usize,
+//         num_filters: usize,
+//         low_frequency: f32,
+//         high_frequency: f32,
+//         dc_elimination: bool,
+//     ) -> Self {
+//         Self(SpeechConfig::new(
+//             sample_rate,
+//             fft_points,
+//             frame_length,
+//             frame_stride,
+//             num_cepstral,
+//             num_filters,
+//             low_frequency,
+//             high_frequency,
+//             dc_elimination,
+//         ))
+//     }
+
+//     #[getter]
+//     fn sample_rate(&self) -> usize {
+//         self.0.sample_rate
+//     }
+
+//     #[getter]
+//     fn fft_points(&self) -> usize {
+//         self.0.window_size
+//     }
+//     #[getter]
+//     fn window_size(&self) -> usize {
+//         self.0.window_size
+//     }
+
+//     #[getter]
+//     fn frame_length(&self) -> f32 {
+//         self.0.frame_length
+//     }
+
+//     #[getter]
+//     fn frame_stride(&self) -> f32 {
+//         self.0.frame_stride
+//     }
+
+//     #[getter]
+//     fn num_cepstral(&self) -> usize {
+//         self.0.num_cepstral
+//     }
+
+//     #[getter]
+//     fn num_filters(&self) -> usize {
+//         self.0.num_filters
+//     }
+
+//     #[getter]
+//     fn low_frequency(&self) -> f32 {
+//         self.0.low_frequency
+//     }
+
+//     #[getter]
+//     fn high_frequency(&self) -> f32 {
+//         self.0.high_frequency
+//     }
+
+//     #[getter]
+//     fn dc_elimination(&self) -> bool {
+//         self.0.dc_elimination
+//     }
+
+//     #[setter]
+//     fn set_sample_rate(&mut self, sample_rate: usize) {
+//         self.0.sample_rate = sample_rate;
+//     }
+
+//     #[setter]
+//     fn set_fft_points(&mut self, fft_points: usize) {
+//         self.set_window_size(fft_points);
+//     }
+//     #[setter]
+//     fn set_window_size(&mut self, fft_points: usize) {
+//         self.0.window_size = fft_points;
+//         self.0.window_size_half = fft_points / 2;
+//     }
+
+//     #[setter]
+//     fn set_frame_length(&mut self, frame_length: f32) {
+//         self.0.frame_length = frame_length;
+//     }
+
+//     #[setter]
+//     fn set_frame_stride(&mut self, frame_stride: f32) {
+//         self.0.frame_stride = frame_stride;
+//     }
+
+//     #[setter]
+//     fn set_num_cepstral(&mut self, num_cepstral: usize) {
+//         self.0.num_cepstral = num_cepstral;
+//     }
+
+//     fn mel_spectrogram(&mut self, signal: &PyArrayDyn<f32>) -> Py<PyArrayDyn<f32>> {
+//         match signal.ndim() {
+//             1 => {
+//                 let signal = signal.as_array().into_dimensionality::<Ix1>().unwrap();
+//                 let mel_spectrogram = feature::mel_spectrogram1(&signal, self.0);
+//                 mel_spectrogram.into_pyarray(self.py()).to_owned()
+//             }
+//         }
+//     }
+// }
+
 #[pymodule]
 fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PySpeechConfig>()?;
+    m.add_class::<PySpeechSauce>()?;
     /// Compute MFCC features from an audio signal.
     ///     Args:
     ///          signal : the audio signal from which to compute features.
@@ -52,7 +169,7 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     fn mfcc<'py>(
         py: Python<'py>,
         signal: PyReadonlyArray1<f32>,
-        config: Py<PySpeechConfig>,
+        config: Py<PySpeechSauce>,
     ) -> &'py PyArray2<f32> {
         let cell = config.as_ref(py);
         let obj_ref = cell.borrow();
@@ -64,20 +181,20 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     fn mel_spectrogram<'py>(
         py: Python<'py>,
         signal: PyReadonlyArrayDyn<f32>,
-        config: Py<PySpeechConfig>,
+        config: Py<PySpeechSauce>,
     ) -> &'py PyArrayDyn<f32> {
         let cell = config.as_ref(py);
         let obj_ref = cell.borrow();
-        let speech_config = obj_ref.0;
+        let speech_config = &obj_ref.0;
         let result = match signal.ndim() {
             1 => feature::mel_spectrogram1(
                 signal.as_array().into_dimensionality().unwrap(),
-                speech_config,
+                &speech_config,
             )
             .into_dyn(),
             2 => feature::mel_spectrogram2(
                 signal.as_array().into_dimensionality().unwrap(),
-                speech_config,
+                &speech_config,
             )
             .into_dyn(),
             _ => {
@@ -119,10 +236,10 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         low_frequency: f32,          // =0,
         high_frequency: Option<f32>, // =None,
         dc_elimination: bool,        //True
-    ) -> Py<PySpeechConfig> {
+    ) -> Py<PySpeechSauce> {
         Py::new(
             py,
-            PySpeechConfig(SpeechConfig::new(
+            PySpeechSauce(SpeechConfig::new(
                 sampling_frequency,
                 fft_length,
                 frame_length,

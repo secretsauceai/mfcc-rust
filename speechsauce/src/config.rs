@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 
 use ndarray::Array2;
 use ndrustfft::{DctHandler, R2cFftHandler};
@@ -123,11 +123,17 @@ pub struct SpeechConfig {
     pub dc_elimination: bool,
     pub wnorm: f32,
     pub window: Vec<f32>,
-    pub analysis_mem: Vec<f32>,
+    pub analysis_mem: RefCell<Vec<f32>>,
     pub dct_handler: DctHandler<f32>,
     pub fft_handler: R2cFftHandler<f32>,
     pub fft_forward: Arc<dyn RealToComplex<f32>>,
-    pub analysis_scratch: Vec<Complex32>,
+    pub analysis_scratch: RefCell<Vec<Complex32>>,
+}
+
+impl Default for SpeechConfig {
+    fn default() -> Self {
+        SpeechConfigBuilder::new(16000).build()
+    }
 }
 
 impl SpeechConfig {
@@ -152,9 +158,9 @@ impl SpeechConfig {
             let sin = (0.5 * pi * (i as f64 + 0.5) / window_size_h as f64).sin();
             *w = (0.5 * pi * sin * sin).sin() as f32;
         }
-        let forward = fft.plan_fft_forward(fft_points);
-        let analysis_mem = vec![0.; fft_points - frame_size];
-        let analysis_scratch = forward.make_scratch_vec();
+        let forward: Arc<dyn RealToComplex<f32>> = fft.plan_fft_forward(fft_points);
+        let analysis_mem = RefCell::new(vec![0.; fft_points - frame_size]);
+        let analysis_scratch = RefCell::new(forward.make_scratch_vec());
         Self {
             dct_handler: DctHandler::new(num_filters),
             fft_handler: R2cFftHandler::new(fft_points),

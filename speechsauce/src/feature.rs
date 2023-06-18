@@ -89,10 +89,13 @@ pub(crate) fn filterbanks(
     filterbank
 }
 
+//TODO: refactor to use mel spectrogram
+//https://github.com/librosa/librosa/blob/519d6d97b0dc9bde42445513bcdfdb9b921d8b7f/librosa/feature/spectral.py#LL1832C8-L1832C8
 /// Compute MFCC features from an audio signal.
 ///     Args:
-///          signal : the audio signal from which to compute features.
+///          signal : the audio signal from which to compute features. Should be an 1-D array(currently)
 ///              Should be an N x 1 array
+///          
 pub fn mfcc(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32> {
     let (mut feature, energy) = mfe(signal, &speech_config);
 
@@ -145,7 +148,7 @@ pub fn mfcc(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32
 }
 //TODO: https://pytorch.org/audio/main/_modules/torchaudio/transforms/_transforms.html#MelSpectrogram
 //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/feature/spectral.py#LL2021C5-L2021C5
-pub fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &mut SpeechConfig) -> Array2<f32> {
+pub fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32> {
     let transformed_signal = stft1(signal, speech_config).mapv(|x| x.abs().powi(2));
     let filter_banks = filterbanks(
         speech_config.num_filters,
@@ -157,7 +160,7 @@ pub fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &mut SpeechConfi
     //"...ft,mf->...mt"
     einsum!("ft,mf->mt", transformed_signal, filter_banks)
 }
-pub fn mel_spectrogram2(signal: ArrayView2<f32>, speech_config: &mut SpeechConfig) -> Array3<f32> {
+pub fn mel_spectrogram2(signal: ArrayView2<f32>, speech_config: &SpeechConfig) -> Array3<f32> {
     let transformed_signal = stft2(signal, speech_config).mapv(|x| x.abs().powi(2));
     let filter_banks = filterbanks(
         speech_config.num_filters,
