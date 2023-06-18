@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use ::speechsauce::{config::SpeechConfig, feature, processing};
 use numpy::{
     IntoPyArray, PyArray1, PyArray2, PyArrayDyn, PyReadonlyArray1, PyReadonlyArray2,
@@ -141,6 +139,7 @@ impl IntoPy<SpeechConfig> for PySpeechSauce {
 // }
 
 #[pymodule]
+#[pyo3(name = "_internal")]
 fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySpeechSauce>()?;
     /// Compute MFCC features from an audio signal.
@@ -233,9 +232,9 @@ fn speechsauce(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         num_cepstral: usize,         // =13,
         num_filters: usize,          // =40,
         fft_length: usize,           // =512,
-        low_frequency: f32,          // =0,
-        high_frequency: Option<f32>, // =None,
+        low_frequency: f32,          // =0
         dc_elimination: bool,        //True
+        high_frequency: Option<f32>, // =None,
     ) -> Py<PySpeechSauce> {
         Py::new(
             py,
