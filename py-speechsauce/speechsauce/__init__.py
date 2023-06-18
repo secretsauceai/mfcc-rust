@@ -1,5 +1,5 @@
 from functools import lru_cache
-from ._internal import mfcc as internal_mfcc, _speech_config, cmvn, preemphasis
+from ._internal import mfcc as __internal_mfcc, mel_spectrogram as __internal_mel_spec, _speech_config, cmvn, preemphasis
 
 __all__ = ["mfcc", "preemphasis", "cmvn"]
 
@@ -79,4 +79,52 @@ def mfcc(
         high_frequency,
         dc_elimination,
     )
-    return internal_mfcc(signal, config)
+    return __internal_mfcc(signal, config)
+
+def mel_spectrogram(
+    signal,
+    sampling_frequency,
+    frame_length=0.020,
+    frame_stride=0.01,
+    num_filters=40,
+    fft_length=512,
+    low_frequency=0,
+    high_frequency=None,
+    dc_elimination=True,
+):
+    """Compute Mel Spectrogram features from an audio signal.
+    Args:
+        signal (array): 
+            the audio signal from which to compute features. Should be an 1 or 2d array
+        sampling_frequency (int): 
+            the sampling frequency of the signal we are working with.
+        frame_length (float): 
+            the length of each frame in seconds.
+        frame_stride (float):
+            the step between successive frames in seconds.
+        num_filters (int):
+            the number of filters in the filterbank.
+        fft_length (int):
+            number of FFT points.
+        low_frequency (float):
+            lowest band edge of mel filters.
+        high_frequency (float):
+            highest band edge of mel filters.
+        dc_elimination (bool):
+            If the first dc component should be eliminated or not.
+    Returns:
+        array:
+            array with shape (..., n_mels, time)
+    """
+    config = _get_speech_config(
+        sampling_frequency,
+        frame_length,
+        frame_stride,
+        0,
+        num_filters,
+        fft_length,
+        low_frequency,
+        high_frequency,
+        dc_elimination,
+    )
+    return __internal_mel_spec(signal, config)

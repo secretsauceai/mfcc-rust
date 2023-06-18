@@ -13,8 +13,9 @@ name = "speechsauce._internal"
 
 [dependencies]
 ndarray="^0.15"
-pyo3 = {version= "0.16.5", features=["extension-module","abi3-py37"]}
-numpy = "0.16.2"
+pyo3 = {version= "0.19.0", features=["extension-module","abi3-py37"]}
+numpy = "0.19.0"
+cached = "0.44.0"
 speechsauce = { path = "../speechsauce" }
 
 
