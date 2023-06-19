@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Optional
 from ._internal import mfcc as __internal_mfcc, mel_spectrogram as __internal_mel_spec, _speech_config, cmvn, preemphasis
 
 __all__ = ["mfcc", "preemphasis", "cmvn"]
@@ -13,7 +14,7 @@ def _get_speech_config(
     num_filters=40,
     fft_length=512,
     low_frequency=0,
-    high_frequency=None,
+    high_frequency: Optional[float]=None,
     dc_elimination=True,
 ):
     """pay no attention to the man behind the curtain
@@ -28,8 +29,8 @@ def _get_speech_config(
         num_filters,
         fft_length,
         low_frequency,
-        high_frequency,
         dc_elimination,
+        high_frequency,
     )
 
 
