@@ -1,8 +1,10 @@
+use std::ops::DerefMut;
+
 use crate::config::SpeechConfig;
 /// This module provides functions for calculating the main speech
 /// features that the package is aimed to extract as well as the required elements.
 use crate::functions::{
-    frequency_to_mel, mel_arr_to_frequency, stft1, stft2, triangle, zero_handling,
+    frequency_to_mel, mel_arr_to_frequency, power_to_db, stft1, stft2, triangle, zero_handling,
 };
 use crate::processing::stack_frames;
 use crate::util::ArrayLog;
@@ -177,6 +179,22 @@ fn _f_it(x: usize) -> Array2<f32> {
     Array2::<f32>::ones((x, 1))
 }
 
+pub fn mfcc_new1(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32> {
+    let S = power_to_db(mel_spectrogram1(signal, speech_config));
+
+    let mut output = Array2::<f32>::zeros((S.shape()[0], speech_config.num_cepstral));
+    
+    //TODO: confirm fidelity
+    //https://github.com/librosa/librosa/blob/519d6d97b0dc9bde42445513bcdfdb9b921d8b7f/librosa/feature/spectral.py#L1991
+    nddct2(
+        &S,
+        &mut output,
+        speech_config.dct_handler.borrow_mut().deref_mut(),
+        1,
+    );
+
+    S
+}
 /// Compute Mel-filterbank energy features from an audio signal.
 ///    Args:
 ///         signal: the audio signal from which to compute features.

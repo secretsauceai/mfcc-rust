@@ -412,14 +412,14 @@ mod test {
         )
     }
 
-    #[test]
-    fn pad_center1_test() {
-        let input_arr = array![[1, 2, 3, 4]];
-        let size = 9;
-        // let padded_arr = pad_center1(input_arr.view(), size, PadType::Constant(0));
-        // assert_eq!(padded_arr, array![[0, 0, 1, 2, 3, 4, 0, 0, 0]])
-        todo!()
-    }
+    // #[test]
+    // fn pad_center1_test() {
+    //     let input_arr = array![[1, 2, 3, 4]];
+    //     let size = 9;
+    //     // let padded_arr = pad_center1(input_arr.view(), size, PadType::Constant(0));
+    //     // assert_eq!(padded_arr, array![[0, 0, 1, 2, 3, 4, 0, 0, 0]])
+    //     todo!()
+    // }
 
     //TODO: add test for pad
 }

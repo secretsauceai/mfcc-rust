@@ -124,7 +124,7 @@ pub struct SpeechConfig {
     pub wnorm: f32,
     pub window: Vec<f32>,
     pub analysis_mem: RefCell<Vec<f32>>,
-    pub dct_handler: DctHandler<f32>,
+    pub dct_handler: RefCell<DctHandler<f32>>,
     pub fft_handler: R2cFftHandler<f32>,
     pub fft_forward: Arc<dyn RealToComplex<f32>>,
     pub analysis_scratch: RefCell<Vec<Complex32>>,
@@ -149,20 +149,20 @@ impl SpeechConfig {
         dc_elimination: bool,
     ) -> Self {
         // Initialize the vorbis window: sin(pi/2*sin^2(pi*n/N))
-        let pi = std::f64::consts::PI;
+        let pi = std::f32::consts::PI;
         let mut fft = RealFftPlanner::<f32>::new();
         let frame_size = (frame_length * sample_rate as f32) as usize;
         let window_size_h = fft_points / 2;
         let mut window = vec![0.0; fft_points];
         for (i, w) in window.iter_mut().enumerate() {
-            let sin = (0.5 * pi * (i as f64 + 0.5) / window_size_h as f64).sin();
-            *w = (0.5 * pi * sin * sin).sin() as f32;
+            let sin = (0.5 * pi * (i as f32 + 0.5) / window_size_h as f32).sin();
+            *w = (0.5 * pi * sin * sin).sin();
         }
         let forward: Arc<dyn RealToComplex<f32>> = fft.plan_fft_forward(fft_points);
         let analysis_mem = RefCell::new(vec![0.; fft_points - frame_size]);
         let analysis_scratch = RefCell::new(forward.make_scratch_vec());
         Self {
-            dct_handler: DctHandler::new(num_filters),
+            dct_handler: RefCell::new(DctHandler::new(num_filters)),
             fft_handler: R2cFftHandler::new(fft_points),
             fft_forward: forward,
             window_size: fft_points,

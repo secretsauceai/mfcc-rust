@@ -27,6 +27,14 @@ where
     freq.mapv(|v| 1127. * (1. + v / 700.).ln())
 }
 
+pub fn power_to_db<D>(power: Array<f32, D>) -> Array<f32, D>
+where
+    D: Dimension,
+{
+    let abs_min: f32 = 1e-10;
+    power.mapv(|v| 10. * f32::max(abs_min, v.abs()).log10())
+}
+
 /// converts a single value from the mel scale to a frequency scale.
 pub fn mel_to_frequency<D>(mel: f32) -> f32 {
     700. * ((mel / 1127.0).exp() - 1.)
@@ -355,3 +363,14 @@ pub fn stft1(
 //     fft_window.slice_mut(s![0..win_length]).assign(&window);
 //     fft_window
 // }
+
+#[cfg(test)]
+mod test {
+    use serde::Deserialize;
+    #[derive(Deserialize)]
+    struct StftArgs {
+        n_fft: usize,
+        hop_length: usize,
+        win_length: usize,
+    }
+}
