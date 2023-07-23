@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::ops::DerefMut;
 
 use crate::config::SpeechConfig;
@@ -151,7 +152,9 @@ pub fn mfcc(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32
 //TODO: https://pytorch.org/audio/main/_modules/torchaudio/transforms/_transforms.html#MelSpectrogram
 //https://github.com/librosa/librosa/blob/c800e74f6a6ec5c27e0fa978d7355943cce04359/librosa/feature/spectral.py#LL2021C5-L2021C5
 pub fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array2<f32> {
-    let transformed_signal = stft1(signal, speech_config).mapv(|x| x.abs().powi(2));
+    let analysis_ref = speech_config.analysis_state.borrow_mut();
+    let analysis_state: &mut crate::config::AnalysisState = &mut analysis_ref.to_owned();
+    let transformed_signal = stft1(signal, analysis_state).mapv(|x| x.abs().powi(2));
     let filter_banks = filterbanks(
         speech_config.num_filters,
         speech_config.freq_size,
@@ -163,7 +166,9 @@ pub fn mel_spectrogram1(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -
     einsum!("ft,mf->mt", transformed_signal, filter_banks)
 }
 pub fn mel_spectrogram2(signal: ArrayView2<f32>, speech_config: &SpeechConfig) -> Array3<f32> {
-    let transformed_signal = stft2(signal, speech_config).mapv(|x| x.abs().powi(2));
+    let analysis_ref = speech_config.analysis_state.borrow_mut();
+    let analysis_state: &mut crate::config::AnalysisState = &mut analysis_ref.to_owned();
+    let transformed_signal = stft2(signal, analysis_state).mapv(|x| x.abs().powi(2));
     let filter_banks = filterbanks(
         speech_config.num_filters,
         speech_config.freq_size,
@@ -183,7 +188,7 @@ pub fn mfcc_new1(signal: ArrayView1<f32>, speech_config: &SpeechConfig) -> Array
     let S = power_to_db(mel_spectrogram1(signal, speech_config));
 
     let mut output = Array2::<f32>::zeros((S.shape()[0], speech_config.num_cepstral));
-    
+
     //TODO: confirm fidelity
     //https://github.com/librosa/librosa/blob/519d6d97b0dc9bde42445513bcdfdb9b921d8b7f/librosa/feature/spectral.py#L1991
     nddct2(

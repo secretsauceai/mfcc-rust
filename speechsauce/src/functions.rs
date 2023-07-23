@@ -1,7 +1,7 @@
 use std::{cell::RefCell, sync::Arc};
 
 use crate::{
-    config::SpeechConfig,
+    config::{AnalysisState, SpeechConfig},
     util::{pad_center1, PadType},
 };
 use cached::proc_macro::cached;
@@ -93,7 +93,7 @@ where
 ///   - `spectrum`: complex array of shape (C, T', F)
 pub fn stft2(
     input: ArrayView2<f32>,
-    speech_config: &SpeechConfig,
+    speech_config: &mut AnalysisState,
     //reset: bool,
 ) -> Array3<Complex32> {
     // if reset {
@@ -109,6 +109,8 @@ pub fn stft2(
             .axis_chunks_iter(Axis(0), speech_config.frame_size)
             .zip(output_ch.outer_iter_mut())
         {
+            //NOTE: the center argument from librosa could probably be implemented here
+            //instead of inspecting the shape at runtime, it would check whe
             let ichunk = ichunk.as_slice().expect("stft ichunk has wrong shape");
             if ichunk.len() == speech_config.frame_size {
                 frame_analysis(
@@ -130,20 +132,20 @@ pub fn stft2(
     output
 }
 
-fn frame_analysis(input: &[f32], output: &mut [Complex32], state: &SpeechConfig) {
+fn frame_analysis(input: &[f32], output: &mut [Complex32], state: &mut AnalysisState) {
     debug_assert_eq!(input.len(), state.frame_size);
-    debug_assert_eq!(output.len(), state.freq_size);
-    let mut mem_ref = state.analysis_mem.borrow_mut();
-    let analysis_mem: &mut Vec<f32> = mem_ref.as_mut();
-    let mut scratch_ref = state.analysis_scratch.borrow_mut();
-    let analysis_scratch = scratch_ref.as_mut();
+    //debug_assert_eq!(output.len(), state.freq_size);
+    //let mut analysis_mem = state.analysis_mem;
+    //let analysis_mem: &mut Vec<f32> = mem_ref;
+    //let mut scratch_ref = state.analysis_scratch;
+    //let analysis_scratch = scratch_ref.as_mut();
     let mut buf = state.fft_forward.make_input_vec();
     // First part of the window on the previous frame
     let (buf_first, buf_second) = buf.split_at_mut(state.window_size - state.frame_size);
     let (window_first, window_second) = state.window.split_at(state.window_size - state.frame_size);
-    let analysis_split = analysis_mem.len() - state.frame_size;
+    let analysis_split = state.analysis_mem.len() - state.frame_size;
     for (&y, &w, x) in izip!(
-        analysis_mem.iter(),
+        state.analysis_mem.iter(),
         window_first.iter(),
         buf_first.iter_mut(),
     ) {
@@ -160,15 +162,15 @@ fn frame_analysis(input: &[f32], output: &mut [Complex32], state: &SpeechConfig)
     // Shift analysis_mem
     if analysis_split > 0 {
         // hop_size is < window_size / 2
-        analysis_mem.rotate_left(state.frame_size);
+        state.analysis_mem.rotate_left(state.frame_size);
     }
     // Copy input to analysis_mem for next iteration
-    for (x, &y) in analysis_mem[analysis_split..].iter_mut().zip(input) {
+    for (x, &y) in state.analysis_mem[analysis_split..].iter_mut().zip(input) {
         *x = y
     }
     state
         .fft_forward
-        .process_with_scratch(&mut buf, output, analysis_scratch)
+        .process_with_scratch(&mut buf, output, &mut state.analysis_scratch)
         .expect("FFT forward failed");
     // Apply normalization in analysis only
     let norm = state.wnorm;
@@ -176,37 +178,10 @@ fn frame_analysis(input: &[f32], output: &mut [Complex32], state: &SpeechConfig)
         *x *= norm;
     }
 }
-// struct AnalysisState {
-//     analysis_mem: Vec<f32>,
-//     analysis_scratch: Vec<Complex32>,
-//     fft_forward: Arc<dyn RealToComplex<f32>>,
-//     wnorm: f32,
-// }
 
-// impl AnalysisState {
-//     fn new(window_size: usize, frame_size: usize) -> Self {
-//         let analysis_mem = vec![0.; window_size];
-
-//         let mut fft_forward = RealFftPlanner::<f32>::new();
-//         let fft_forward = fft_forward.plan_fft_forward(window_size);
-//         let analysis_scratch = fft_forward.make_scratch_vec();
-//         let wnorm = 1. / window_size as f32;
-//         Self {
-//             analysis_mem,
-//             analysis_scratch,
-//             fft_forward,
-//             wnorm,
-//         }
-//     }
-// }
-
-// #[cached]
-// fn get_analysis_state(window_size: usize, frame_size: usize) -> &'static RefCell<AnalysisState> {
-//     AnalysisState::new(window_size, frame_size)
-// }
 pub fn stft1(
     input: ArrayView1<f32>,
-    speech_config: &SpeechConfig,
+    speech_config: &mut AnalysisState,
     //reset: bool,
 ) -> Array2<Complex32> {
     // if reset {

@@ -1,3 +1,4 @@
+use std::ops::DerefMut;
 use std::{cell::RefCell, sync::Arc};
 
 use ndarray::Array2;
@@ -115,19 +116,14 @@ pub struct SpeechConfig {
     pub low_frequency: f32,
     ///highest band edge of mel filters in Hz.
     pub high_frequency: f32,
-    /// Number of frequency bins, which is (window_size/2)+1
     pub freq_size: usize,
-    /// Number of samples in a frame, which is frame_length * sample_rate
-    pub frame_size: usize,
+
     /// If the first dc component should be eliminated or not
     pub dc_elimination: bool,
-    pub wnorm: f32,
-    pub window: Vec<f32>,
-    pub analysis_mem: RefCell<Vec<f32>>,
+
     pub dct_handler: RefCell<DctHandler<f32>>,
     pub fft_handler: R2cFftHandler<f32>,
-    pub fft_forward: Arc<dyn RealToComplex<f32>>,
-    pub analysis_scratch: RefCell<Vec<Complex32>>,
+    pub(crate) analysis_state: RefCell<AnalysisState>,
 }
 
 impl Default for SpeechConfig {
@@ -164,23 +160,18 @@ impl SpeechConfig {
         Self {
             dct_handler: RefCell::new(DctHandler::new(num_filters)),
             fft_handler: R2cFftHandler::new(fft_points),
-            fft_forward: forward,
             window_size: fft_points,
             window_size_half: window_size_h,
             frame_length,
             frame_stride,
+            freq_size: fft_points / 2 + 1,
             num_cepstral,
             num_filters,
             low_frequency,
             high_frequency,
             dc_elimination,
             sample_rate,
-            wnorm: 1.0 / (fft_points.pow(2) as f32 / (2 * frame_size) as f32),
-            freq_size: (fft_points / 2) + 1,
-            frame_size: frame_size,
-            window,
-            analysis_mem,
-            analysis_scratch: analysis_scratch,
+            analysis_state: RefCell::new(AnalysisState::new(fft_points, frame_size)),
         }
     }
 
@@ -189,26 +180,52 @@ impl SpeechConfig {
     }
 }
 
-// struct AnalysisState {
-//     analysis_mem: Vec<f32>,
-//     analysis_scratch: Vec<Complex32>,
-//     fft_forward: Arc<dyn RealToComplex<f32>>,
-//     wnorm: f32,
-// }
+#[derive(Clone)]
+pub struct AnalysisState {
+    pub(crate) window_size: usize,
+    pub(crate) window_size_half: usize,
+    /// Number of samples in a frame, which is frame_length * sample_rate
+    pub(crate) frame_size: usize,
+    /// Number of frequency bins, which is (window_size/2)+1
+    pub(crate) freq_size: usize,
+    pub(crate) window: Vec<f32>,
+    pub(crate) analysis_mem: Vec<f32>,
+    pub(crate) analysis_scratch: Vec<Complex32>,
+    pub(crate) fft_forward: Arc<dyn RealToComplex<f32>>,
+    pub(crate) wnorm: f32,
+}
 
-// impl AnalysisState {
-//     fn new(window_size: usize, frame_size: usize) -> Self {
-//         let analysis_mem = vec![0.; window_size];
-
-//         let mut fft_forward = RealFftPlanner::<f32>::new();
-//         let fft_forward = fft_forward.plan_fft_forward(window_size);
-//         let analysis_scratch = fft_forward.make_scratch_vec();
-//         let wnorm = 1. / window_size as f32;
-//         Self {
-//             analysis_mem,
-//             analysis_scratch,
-//             fft_forward,
-//             wnorm,
-//         }
+// impl DerefMut for AnalysisState {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         todo!()
 //     }
 // }
+
+// impl AsMut for AnalysisState {
+//     fn as_mut(&mut self) -> &mut T {
+//         todo!()
+//     }
+// }
+
+impl AnalysisState {
+    pub fn new(window_size: usize, frame_size: usize) -> Self {
+        let window = vec![0.; window_size];
+        let analysis_mem = vec![0.; window_size];
+
+        let mut fft_forward = RealFftPlanner::<f32>::new();
+        let fft_forward = fft_forward.plan_fft_forward(window_size);
+        let analysis_scratch = fft_forward.make_scratch_vec();
+        let wnorm = 1. / window_size as f32;
+        Self {
+            window_size,
+            window_size_half: window_size / 2,
+            frame_size,
+            freq_size: window_size / 2 + 1,
+            window,
+            analysis_mem,
+            analysis_scratch,
+            fft_forward,
+            wnorm,
+        }
+    }
+}
