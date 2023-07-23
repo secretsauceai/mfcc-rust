@@ -188,3 +188,27 @@ impl SpeechConfig {
         SpeechConfigBuilder::default()
     }
 }
+
+// struct AnalysisState {
+//     analysis_mem: Vec<f32>,
+//     analysis_scratch: Vec<Complex32>,
+//     fft_forward: Arc<dyn RealToComplex<f32>>,
+//     wnorm: f32,
+// }
+
+// impl AnalysisState {
+//     fn new(window_size: usize, frame_size: usize) -> Self {
+//         let analysis_mem = vec![0.; window_size];
+
+//         let mut fft_forward = RealFftPlanner::<f32>::new();
+//         let fft_forward = fft_forward.plan_fft_forward(window_size);
+//         let analysis_scratch = fft_forward.make_scratch_vec();
+//         let wnorm = 1. / window_size as f32;
+//         Self {
+//             analysis_mem,
+//             analysis_scratch,
+//             fft_forward,
+//             wnorm,
+//         }
+//     }
+// }

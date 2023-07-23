@@ -252,8 +252,7 @@ fn edge_pad<A, D>(
     D: Dimension,
 {
     //let mut sub_len: usize;
-    let mut range_start: isize;
-    let mut range_stop: isize;
+
     for (ax, (&ax_len, &[pre_ax, post_ax])) in
         input_array.shape().iter().zip(&pad_width).enumerate()
     {
@@ -263,16 +262,16 @@ fn edge_pad<A, D>(
             continue;
         }
 
-        range_start = if pre_ax > 0 {
-            0 - (pre_ax / ax_len) as isize
-        } else {
-            0
-        };
-        range_stop = if post_ax > 0 {
-            (post_ax / ax_len) as isize + 1
-        } else {
-            1
-        };
+        // let mut range_start = if pre_ax > 0 {
+        //     0 - (pre_ax / ax_len) as isize
+        // } else {
+        //     0
+        // };
+        // let mut range_stop = if post_ax > 0 {
+        //     (post_ax / ax_len) as isize + 1
+        // } else {
+        //     1
+        // };
         let mut portion = padded_array.view_mut();
         let mut input_slice = input_array.view();
         for (axis, &[lo, hi]) in pad_width.iter().enumerate() {
